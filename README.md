@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Sistema de Finanzas Personales
 
 Aplicación web para gestionar ingresos, gastos, métodos de pago, tarjetas de crédito, cuotas, pagos y movimientos recurrentes.
@@ -193,7 +192,3 @@ __pycache__/
 ```
 
 ---
-=======
-Prueba
-voy a colocar mi proyecto de heladeria aca xd
->>>>>>> b5f85243c0a7f02c930bd3c16e31ef35caca67da
