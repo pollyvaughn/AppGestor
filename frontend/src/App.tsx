@@ -1,5 +1,6 @@
 import { useState } from "react"
 import LoginPage from "./pages/LoginPage"
+import RegisterPage from "./pages/RegisterPage"
 import type { Usuario } from "./types/auth"
 
 export default function App() {
@@ -13,6 +14,8 @@ export default function App() {
         return JSON.parse(usuarioGuardado)
     })
 
+    const [mostrarRegistro, setMostrarRegistro] = useState(false)
+
     function cerrarSesion() {
         localStorage.removeItem("token")
         localStorage.removeItem("usuario")
@@ -23,8 +26,34 @@ export default function App() {
         setUsuario(usuario)
     }
 
+    function irARegistro() {
+        setMostrarRegistro(true)
+    }
+
+    function irALogin() {
+        setMostrarRegistro(false)
+    }
+
+    function registroExitoso() {
+        setMostrarRegistro(false)
+    }
+
     if (!usuario) {
-        return <LoginPage onLogin={iniciarSesion} />
+        if (mostrarRegistro) {
+            return (
+                <RegisterPage
+                    onRegister={registroExitoso}
+                    onLogin={irALogin}
+                 />
+            )
+        }
+
+        return (
+            <LoginPage
+                onLogin={iniciarSesion}
+                onRegister={irARegistro}
+            />
+)
     }
 
     return (
