@@ -3,8 +3,20 @@ from backend.database import get_connection
 from backend.routes.categorias import router as categorias_router
 from backend.routes.usuarios import router as usuarios_router
 from backend.routes.auth import router as auth_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Finanzas API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(categorias_router)
 app.include_router(usuarios_router)
