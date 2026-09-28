@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from backend.models.usuario import UsuarioCrear, UsuarioActualizar
 from backend.services.usuario_service import (
@@ -8,8 +8,9 @@ from backend.services.usuario_service import (
     desactivar_usuario
 )
 
-router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
+from backend.auth.dependencies import obtener_usuario_actual
 
+router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
 @router.post("/")
 def registrar_usuario(usuario: UsuarioCrear):
@@ -27,6 +28,9 @@ def registrar_usuario(usuario: UsuarioCrear):
             detail=str(e)
         )
 
+@router.get("/me")
+def usuario_actual(usuario=Depends(obtener_usuario_actual)):
+    return usuario
 
 @router.get("/{usuario_id}")
 def obtener(usuario_id: int):
