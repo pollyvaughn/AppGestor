@@ -1,7 +1,7 @@
 from backend.database import get_connection
 
 
-def crear_categoria(categoria):
+def crear_categoria(categoria, usuario_id):
     conexion = get_connection()
 
     try:
@@ -14,7 +14,7 @@ def crear_categoria(categoria):
         """
 
         valores = (
-            categoria.usuario_id,
+            usuario_id,
             categoria.nombre,
             categoria.tipo,
             categoria.color

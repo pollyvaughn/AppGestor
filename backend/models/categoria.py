@@ -1,8 +1,8 @@
 from pydantic import BaseModel
+from typing import Literal
 
 
 class CategoriaCrear(BaseModel):
-    usuario_id: int
     nombre: str
-    tipo: str
+    tipo: Literal["INGRESO", "EGRESO"]
     color: str | None = None
