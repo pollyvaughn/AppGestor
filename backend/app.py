@@ -4,6 +4,7 @@ from backend.routes.categorias import router as categorias_router
 from backend.routes.usuarios import router as usuarios_router
 from backend.routes.auth import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
+from backend.routes.metodos_pago import router as metodos_pago_router
 
 app = FastAPI(title="Finanzas API")
 
@@ -18,9 +19,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(categorias_router)
-app.include_router(usuarios_router)
 app.include_router(auth_router)
+app.include_router(categorias_router)
+app.include_router(metodos_pago_router)
+
+app.include_router(usuarios_router)
 
 @app.get("/")
 def inicio():
@@ -44,3 +47,4 @@ def probar_conexion():
     finally:
         cursor.close()
         conexion.close()
+
