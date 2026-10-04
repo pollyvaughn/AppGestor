@@ -7,6 +7,8 @@ import {
     listarCuotas
 } from "../services/compraTarjetaService"
 
+import { crearPago } from "../services/pagoService"
+
 type Compra = {
     id: number
     tarjeta_id: number
@@ -168,6 +170,43 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
         }
     }
 
+    async function manejarPago(cuota: Cuota) {
+        const monto = window.prompt(
+            "Monto a pagar de la cuota " + cuota.numero + ":",
+            String(cuota.monto_pendiente)
+        )
+
+        if (monto === null) {
+            return
+        }
+
+        const montoNumerico = Number(monto)
+
+        if (montoNumerico <= 0) {
+            setError("El monto debe ser mayor a 0")
+            return
+        }
+
+        try {
+            setError("")
+            setMensaje("")
+
+            await crearPago(cuota.id, montoNumerico)
+
+            setMensaje("Pago registrado correctamente")
+
+            if (compraSeleccionada !== null) {
+                await verCuotas(compraSeleccionada)
+            }
+        } catch (error) {
+            if (error instanceof Error) {
+                setError(error.message)
+            } else {
+                setError("No se pudo registrar el pago")
+            }
+        }
+    }
+
     return (
         <main>
             <h1>Compras con tarjeta</h1>
@@ -274,11 +313,14 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                     compras.map(function (compra) {
                         return (
                             <article key={compra.id}>
-                                <h3>{compra.descripcion || "Compra sin descripción"}</h3>
+                                <h3>
+                                    {compra.descripcion || "Compra sin descripción"}
+                                </h3>
 
                                 <p>
                                     Tarjeta: {compra.tarjeta}
                                 </p>
+
                                 <p>
                                     Monto: {compra.monto_base}
                                 </p>
@@ -319,15 +361,47 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                     <section>
                                         <h4>Cuotas</h4>
 
-                                        {cuotas.map(function (cuota) {
+                                        {cuotas.map(function (cuota, indice) {
+                                            const cuotaAnterior =
+                                                cuotas[indice - 1]
+
+                                            const puedePagar =
+                                                cuota.estado !== "PAGADA" &&
+                                                (
+                                                    indice === 0 ||
+                                                    cuotaAnterior.estado === "PAGADA"
+                                                )
+
                                             return (
-                                                <p key={cuota.id}>
-                                                    Cuota {cuota.numero} —
-                                                    {" "}
-                                                    {cuota.monto_base}
-                                                    {" — "}
-                                                    {cuota.estado}
-                                                </p>
+                                                <div key={cuota.id}>
+                                                    <p>
+                                                        Cuota {cuota.numero} —{" "}
+                                                        {cuota.monto_base} —{" "}
+                                                        {cuota.estado}
+                                                    </p>
+
+                                                    <p>
+                                                        Pendiente:{" "}
+                                                        {cuota.monto_pendiente}
+                                                    </p>
+
+                                                    {puedePagar && (
+                                                        <button
+                                                            onClick={function () {
+                                                                manejarPago(cuota)
+                                                            }}
+                                                        >
+                                                            Pagar cuota
+                                                        </button>
+                                                    )}
+
+                                                    {cuota.estado !== "PAGADA" &&
+                                                        !puedePagar && (
+                                                            <p>
+                                                                Esperando pago de cuotas anteriores
+                                                            </p>
+                                                        )}
+                                                </div>
                                             )
                                         })}
                                     </section>
