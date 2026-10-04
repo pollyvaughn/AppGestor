@@ -2,7 +2,7 @@ import { useState } from "react"
 import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
 import type { Usuario } from "./types/auth"
-import TarjetasPage from "./pages/TarjetasPage"
+import TarjetasYComprasPage from "./pages/TarjetasYComprasPage"
 
 export default function App() {
     const [usuario, setUsuario] = useState<Usuario | null>(function () {
@@ -59,7 +59,7 @@ export default function App() {
 
     return (
     <>
-        <TarjetasPage />
+        <TarjetasYComprasPage />
 
         <button onClick={cerrarSesion}>
             Cerrar sesión

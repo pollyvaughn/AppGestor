@@ -143,7 +143,8 @@ def listar_compras(usuario_id):
                 mp.nombre AS tarjeta,
                 ct.monto_base,
                 ct.cantidad_cuotas,
-                ct.fecha_compra
+                ct.fecha_compra,
+                m.descripcion
             FROM compra_tarjeta ct
             INNER JOIN tarjeta_credito tc
                 ON ct.tarjeta_id = tc.id
@@ -197,6 +198,134 @@ def listar_cuotas(compra_id, usuario_id):
         )
 
         return cursor.fetchall()
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+def editar_compra(compra_id, compra, usuario_id):
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+
+        conexion.start_transaction()
+
+        cursor.execute(
+            """
+            SELECT
+                ct.id,
+                ct.monto_base,
+                ct.cantidad_cuotas
+            FROM compra_tarjeta ct
+            INNER JOIN movimiento m
+                ON ct.movimiento_id = m.id
+            WHERE ct.id = %s
+            AND m.usuario_id = %s
+            """,
+            (compra_id, usuario_id)
+        )
+
+        compra_actual = cursor.fetchone()
+
+        if not compra_actual:
+            return 0
+
+        cursor.execute(
+            """
+            UPDATE movimiento m
+            INNER JOIN compra_tarjeta ct
+                ON m.id = ct.movimiento_id
+            SET
+                m.descripcion = %s
+            WHERE ct.id = %s
+            AND m.usuario_id = %s
+            """,
+            (
+                compra.descripcion,
+                compra_id,
+                usuario_id
+            )
+        )
+
+        conexion.commit()
+
+        return 1
+
+    except Exception:
+        conexion.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+
+def eliminar_compra(compra_id, usuario_id):
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+
+        conexion.start_transaction()
+
+        cursor.execute(
+            """
+            SELECT
+                ct.id,
+                ct.movimiento_id
+            FROM compra_tarjeta ct
+            INNER JOIN movimiento m
+                ON ct.movimiento_id = m.id
+            WHERE ct.id = %s
+            AND m.usuario_id = %s
+            """,
+            (
+                compra_id,
+                usuario_id
+            )
+        )
+
+        compra = cursor.fetchone()
+
+        if not compra:
+            return 0
+
+        cursor.execute(
+            """
+            DELETE FROM cuota
+            WHERE compra_tarjeta_id = %s
+            """,
+            (compra_id,)
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM compra_tarjeta
+            WHERE id = %s
+            """,
+            (compra_id,)
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM movimiento
+            WHERE id = %s
+            AND usuario_id = %s
+            """,
+            (
+                compra["movimiento_id"],
+                usuario_id
+            )
+        )
+
+        conexion.commit()
+
+        return 1
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()

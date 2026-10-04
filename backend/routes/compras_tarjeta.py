@@ -5,7 +5,9 @@ from backend.models.compra_tarjeta import CompraTarjetaCrear
 from backend.services.compra_tarjeta_service import (
     crear_compra,
     listar_compras,
-    listar_cuotas
+    listar_cuotas,
+    editar_compra,
+    eliminar_compra
 )
 
 
@@ -51,3 +53,46 @@ def cuotas(
         compra_id,
         usuario["id"]
     )
+
+@router.put("/{compra_id}")
+def editar(
+    compra_id: int,
+    compra: CompraTarjetaCrear,
+    usuario=Depends(obtener_usuario_actual)
+):
+    resultado = editar_compra(
+        compra_id,
+        compra,
+        usuario["id"]
+    )
+
+    if resultado == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Compra no encontrada"
+        )
+
+    return {
+        "mensaje": "Compra actualizada"
+    }
+
+
+@router.delete("/{compra_id}")
+def eliminar(
+    compra_id: int,
+    usuario=Depends(obtener_usuario_actual)
+):
+    resultado = eliminar_compra(
+        compra_id,
+        usuario["id"]
+    )
+
+    if resultado == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Compra no encontrada"
+        )
+
+    return {
+        "mensaje": "Compra eliminada"
+    }
