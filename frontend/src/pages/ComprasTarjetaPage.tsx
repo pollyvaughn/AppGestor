@@ -8,6 +8,7 @@ import {
 } from "../services/compraTarjetaService"
 
 import { crearPago } from "../services/pagoService"
+import { listarMetodosPago } from "../services/metodoPagoService"
 
 type Compra = {
     id: number
@@ -40,6 +41,14 @@ type Props = {
     tarjetas: Tarjeta[]
 }
 
+type MetodoPago = {
+    id: number
+    nombre: string
+    tipo: string
+    moneda: string
+    estado: string
+}
+
 export default function ComprasTarjetaPage({ tarjetas }: Props) {
     const [compras, setCompras] = useState<Compra[]>([])
     const [cuotas, setCuotas] = useState<Cuota[]>([])
@@ -57,6 +66,18 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
 
+    const [metodosPago, setMetodosPago] =
+        useState<MetodoPago[]>([])
+
+    const [cuotaPagando, setCuotaPagando] =
+        useState<Cuota | null>(null)
+
+    const [metodo1Id, setMetodo1Id] = useState("")
+    const [metodo1Monto, setMetodo1Monto] = useState("")
+
+    const [metodo2Id, setMetodo2Id] = useState("")
+    const [metodo2Monto, setMetodo2Monto] = useState("")
+
     async function cargarCompras() {
         try {
             const datos = await listarCompras()
@@ -66,8 +87,18 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
         }
     }
 
+    async function cargarMetodosPago() {
+        try {
+            const datos = await listarMetodosPago()
+            setMetodosPago(datos)
+        } catch {
+            setError("No se pudieron cargar los métodos de pago")
+        }
+    }
+
     useEffect(function () {
         cargarCompras()
+        cargarMetodosPago()
     }, [])
 
     function limpiarFormulario() {
@@ -170,30 +201,100 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
         }
     }
 
-    async function manejarPago(cuota: Cuota) {
-        const monto = window.prompt(
-            "Monto a pagar de la cuota " + cuota.numero + ":",
-            String(cuota.monto_pendiente)
-        )
+    function manejarPago(cuota: Cuota) {
+        setError("")
+        setMensaje("")
 
-        if (monto === null) {
+        setCuotaPagando(cuota)
+
+        setMetodo1Id("")
+        setMetodo1Monto(String(cuota.monto_pendiente))
+
+        setMetodo2Id("")
+        setMetodo2Monto("")
+    }
+
+    function cancelarPago() {
+        setCuotaPagando(null)
+        setMetodo1Id("")
+        setMetodo1Monto("")
+        setMetodo2Id("")
+        setMetodo2Monto("")
+    }
+
+    async function confirmarPago() {
+        if (cuotaPagando === null) {
             return
         }
 
-        const montoNumerico = Number(monto)
+        const monto1 = Number(metodo1Monto)
+        const monto2 = Number(metodo2Monto)
 
-        if (montoNumerico <= 0) {
-            setError("El monto debe ser mayor a 0")
+        if (!metodo1Id) {
+            setError("Seleccioná el primer método de pago")
             return
+        }
+
+        if (monto1 <= 0) {
+            setError(
+                "El monto del primer método debe ser mayor a 0"
+            )
+            return
+        }
+
+        if (metodo2Id && monto2 <= 0) {
+            setError(
+                "El monto del segundo método debe ser mayor a 0"
+            )
+            return
+        }
+
+        if (
+            metodo1Id === metodo2Id &&
+            metodo2Id !== ""
+        ) {
+            setError(
+                "Los métodos de pago deben ser diferentes"
+            )
+            return
+        }
+
+        const total = monto1 + monto2
+
+        if (total !== cuotaPagando.monto_pendiente) {
+            setError(
+                `Los métodos deben sumar exactamente ${cuotaPagando.monto_pendiente}`
+            )
+            return
+        }
+
+        const metodos = [
+            {
+                metodo_pago_id: Number(metodo1Id),
+                monto: monto1
+            }
+        ]
+
+        if (metodo2Id) {
+            metodos.push({
+                metodo_pago_id: Number(metodo2Id),
+                monto: monto2
+            })
         }
 
         try {
             setError("")
             setMensaje("")
 
-            await crearPago(cuota.id, montoNumerico)
+            await crearPago(
+                cuotaPagando.id,
+                cuotaPagando.monto_pendiente,
+                metodos
+            )
 
             setMensaje("Pago registrado correctamente")
+
+            cancelarPago()
 
             if (compraSeleccionada !== null) {
                 await verCuotas(compraSeleccionada)
@@ -271,12 +372,17 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                         disabled={compraEditando !== null}
                     />
 
-                    {monto && cantidadCuotas && Number(cantidadCuotas) > 0 && (
-                        <p>
-                            Cuota estimada: Gs.{" "}
-                            {(Number(monto) / Number(cantidadCuotas)).toLocaleString("es-PY")}
-                        </p>
-                    )}
+                    {monto &&
+                        cantidadCuotas &&
+                        Number(cantidadCuotas) > 0 && (
+                            <p>
+                                Cuota estimada: Gs.{" "}
+                                {(
+                                    Number(monto) /
+                                    Number(cantidadCuotas)
+                                ).toLocaleString("es-PY")}
+                            </p>
+                        )}
 
                     <input
                         type="text"
@@ -314,7 +420,8 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                         return (
                             <article key={compra.id}>
                                 <h3>
-                                    {compra.descripcion || "Compra sin descripción"}
+                                    {compra.descripcion ||
+                                        "Compra sin descripción"}
                                 </h3>
 
                                 <p>
@@ -361,7 +468,10 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                     <section>
                                         <h4>Cuotas</h4>
 
-                                        {cuotas.map(function (cuota, indice) {
+                                        {cuotas.map(function (
+                                            cuota,
+                                            indice
+                                        ) {
                                             const cuotaAnterior =
                                                 cuotas[indice - 1]
 
@@ -369,13 +479,15 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                                 cuota.estado !== "PAGADA" &&
                                                 (
                                                     indice === 0 ||
-                                                    cuotaAnterior.estado === "PAGADA"
+                                                    cuotaAnterior.estado ===
+                                                        "PAGADA"
                                                 )
 
                                             return (
                                                 <div key={cuota.id}>
                                                     <p>
-                                                        Cuota {cuota.numero} —{" "}
+                                                        Cuota{" "}
+                                                        {cuota.numero} —{" "}
                                                         {cuota.monto_base} —{" "}
                                                         {cuota.estado}
                                                     </p>
@@ -388,22 +500,226 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                                     {puedePagar && (
                                                         <button
                                                             onClick={function () {
-                                                                manejarPago(cuota)
+                                                                manejarPago(
+                                                                    cuota
+                                                                )
                                                             }}
                                                         >
                                                             Pagar cuota
                                                         </button>
                                                     )}
 
-                                                    {cuota.estado !== "PAGADA" &&
+                                                    {cuota.estado !==
+                                                        "PAGADA" &&
                                                         !puedePagar && (
                                                             <p>
-                                                                Esperando pago de cuotas anteriores
+                                                                Esperando
+                                                                pago de cuotas
+                                                                anteriores
                                                             </p>
                                                         )}
                                                 </div>
                                             )
                                         })}
+
+                                        {cuotaPagando !== null && (
+                                            <section>
+                                                <h4>
+                                                    Pagar cuota{" "}
+                                                    {cuotaPagando.numero}
+                                                </h4>
+
+                                                <p>
+                                                    Pendiente:{" "}
+                                                    {
+                                                        cuotaPagando.monto_pendiente
+                                                    }
+                                                </p>
+
+                                                <div>
+                                                    <h5>
+                                                        Primer método
+                                                    </h5>
+
+                                                    <select
+                                                        value={metodo1Id}
+                                                        onChange={function (
+                                                            evento
+                                                        ) {
+                                                            setMetodo1Id(
+                                                                evento.target
+                                                                    .value
+                                                            )
+                                                        }}
+                                                    >
+                                                        <option value="">
+                                                            Seleccioná un método
+                                                        </option>
+
+                                                        {metodosPago
+                                                            .filter(
+                                                                function (
+                                                                    metodo
+                                                                ) {
+                                                                    return (
+                                                                        metodo.estado ===
+                                                                        "ACTIVO"
+                                                                    )
+                                                                }
+                                                            )
+                                                            .map(
+                                                                function (
+                                                                    metodo
+                                                                ) {
+                                                                    return (
+                                                                        <option
+                                                                            key={
+                                                                                metodo.id
+                                                                            }
+                                                                            value={
+                                                                                metodo.id
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                metodo.nombre
+                                                                            }{" "}
+                                                                            (
+                                                                            {
+                                                                                metodo.tipo
+                                                                            }
+                                                                            )
+                                                                        </option>
+                                                                    )
+                                                                }
+                                                            )}
+                                                    </select>
+
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={metodo1Monto}
+                                                        onChange={function (
+                                                            evento
+                                                        ) {
+                                                            setMetodo1Monto(
+                                                                evento.target
+                                                                    .value
+                                                            )
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <h5>
+                                                        Segundo método
+                                                        (opcional)
+                                                    </h5>
+
+                                                    <select
+                                                        value={metodo2Id}
+                                                        onChange={function (
+                                                            evento
+                                                        ) {
+                                                            setMetodo2Id(
+                                                                evento.target
+                                                                    .value
+                                                            )
+                                                        }}
+                                                    >
+                                                        <option value="">
+                                                            Sin segundo método
+                                                        </option>
+
+                                                        {metodosPago
+                                                            .filter(
+                                                                function (
+                                                                    metodo
+                                                                ) {
+                                                                    return (
+                                                                        metodo.estado ===
+                                                                            "ACTIVO" &&
+                                                                        String(
+                                                                            metodo.id
+                                                                        ) !==
+                                                                            metodo1Id
+                                                                    )
+                                                                }
+                                                            )
+                                                            .map(
+                                                                function (
+                                                                    metodo
+                                                                ) {
+                                                                    return (
+                                                                        <option
+                                                                            key={
+                                                                                metodo.id
+                                                                            }
+                                                                            value={
+                                                                                metodo.id
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                metodo.nombre
+                                                                            }{" "}
+                                                                            (
+                                                                            {
+                                                                                metodo.tipo
+                                                                            }
+                                                                            )
+                                                                        </option>
+                                                                    )
+                                                                }
+                                                            )}
+                                                    </select>
+
+                                                    {metodo2Id && (
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            value={
+                                                                metodo2Monto
+                                                            }
+                                                            onChange={function (
+                                                                evento
+                                                            ) {
+                                                                setMetodo2Monto(
+                                                                    evento.target
+                                                                        .value
+                                                                )
+                                                            }}
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                <p>
+                                                    Total seleccionado:{" "}
+                                                    {(
+                                                        Number(
+                                                            metodo1Monto || 0
+                                                        ) +
+                                                        Number(
+                                                            metodo2Monto || 0
+                                                        )
+                                                    ).toLocaleString("es-PY")}
+                                                </p>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={confirmarPago}
+                                                >
+                                                    Confirmar pago
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelarPago}
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </section>
+                                        )}
                                     </section>
                                 )}
                             </article>

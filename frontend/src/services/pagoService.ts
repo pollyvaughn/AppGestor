@@ -1,8 +1,14 @@
 const API_URL = "http://127.0.0.1:8000"
 
+type MetodoPago = {
+    metodo_pago_id: number
+    monto: number
+}
+
 export async function crearPago(
     cuotaId: number,
-    monto: number
+    monto: number,
+    metodos: MetodoPago[]
 ) {
     const token = localStorage.getItem("token")
 
@@ -14,7 +20,8 @@ export async function crearPago(
         },
         body: JSON.stringify({
             cuota_id: cuotaId,
-            monto: monto
+            monto: monto,
+            metodos: metodos
         })
     })
 

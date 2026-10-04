@@ -44,11 +44,35 @@ def crear_pago(pago, usuario_id):
                 detail="La cuota ya está pagada"
             )
 
+        if pago.monto <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="El monto debe ser mayor a 0"
+            )
+
         if pago.monto > float(cuota["monto_pendiente"]):
             raise HTTPException(
                 status_code=400,
                 detail="El monto supera el pendiente de la cuota"
             )
+
+        monto_metodos = sum(
+            metodo.monto
+            for metodo in pago.metodos
+        )
+
+        if round(monto_metodos, 2) != round(pago.monto, 2):
+            raise HTTPException(
+                status_code=400,
+                detail="La suma de los métodos de pago debe coincidir con el monto del pago"
+            )
+
+        for metodo in pago.metodos:
+            if metodo.monto <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El monto de cada método debe ser mayor a 0"
+                )
 
         cursor.execute(
             """
@@ -73,27 +97,39 @@ def crear_pago(pago, usuario_id):
                 detail="Debes pagar las cuotas anteriores primero"
             )
 
-        cursor.execute(
-            """
-            SELECT u.id
-            FROM usuario u
-            INNER JOIN metodo_pago mp
-                ON mp.usuario_id = u.id
-            INNER JOIN tarjeta_credito tc
-                ON tc.metodo_pago_id = mp.id
-            WHERE tc.id = %s
-              AND u.id = %s
-            """,
-            (cuota["tarjeta_id"], usuario_id)
-        )
-
-        usuario = cursor.fetchone()
-
-        if not usuario:
-            raise HTTPException(
-                status_code=403,
-                detail="La cuota no pertenece al usuario"
+        for metodo in pago.metodos:
+            cursor.execute(
+                """
+                SELECT id, estado, moneda
+                FROM metodo_pago
+                WHERE id = %s
+                  AND usuario_id = %s
+                """,
+                (
+                    metodo.metodo_pago_id,
+                    usuario_id
+                )
             )
+
+            metodo_pago = cursor.fetchone()
+
+            if not metodo_pago:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Uno de los métodos de pago no pertenece al usuario"
+                )
+
+            if metodo_pago["estado"] != "ACTIVO":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Uno de los métodos de pago está inactivo"
+                )
+
+            if metodo_pago["moneda"] != cuota["moneda"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Los métodos de pago deben utilizar la misma moneda que la cuota"
+                )
 
         cursor.execute(
             """
@@ -159,7 +195,34 @@ def crear_pago(pago, usuario_id):
 
         pago_id = cursor.lastrowid
 
-        nuevo_pendiente = float(cuota["monto_pendiente"]) - pago.monto
+        for metodo in pago.metodos:
+            cursor.execute(
+                """
+                INSERT INTO movimiento_metodo
+                (
+                    movimiento_id,
+                    metodo_pago_id,
+                    monto,
+                    moneda
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+                """,
+                (
+                    movimiento_id,
+                    metodo.metodo_pago_id,
+                    metodo.monto,
+                    cuota["moneda"]
+                )
+            )
+
+        nuevo_pendiente = (
+            float(cuota["monto_pendiente"]) - pago.monto
+        )
 
         if nuevo_pendiente == 0:
             nuevo_estado = "PAGADA"
