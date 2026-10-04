@@ -2,6 +2,7 @@ import { useState } from "react"
 import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
 import type { Usuario } from "./types/auth"
+import TarjetasPage from "./pages/TarjetasPage"
 
 export default function App() {
     const [usuario, setUsuario] = useState<Usuario | null>(function () {
@@ -57,12 +58,12 @@ export default function App() {
     }
 
     return (
-        <main>
-            <h1>Bienvenido, {usuario.nombre}</h1>
+    <>
+        <TarjetasPage />
 
-            <button onClick={cerrarSesion}>
-                Cerrar sesión
-            </button>
-        </main>
+        <button onClick={cerrarSesion}>
+            Cerrar sesión
+        </button>
+    </>
     )
 }
