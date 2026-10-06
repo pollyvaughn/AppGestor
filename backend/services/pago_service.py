@@ -1,6 +1,46 @@
 from fastapi import HTTPException
 from backend.database import get_connection
 
+def obtener_total_cuota(cursor, cuota_id):
+    cursor.execute(
+        """
+        SELECT
+            c.monto_base,
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN a.tipo IN (
+                            'RECARGO',
+                            'INTERES',
+                            'COMISION',
+                            'ADICIONAL'
+                        )
+                        THEN a.monto
+                        WHEN a.tipo = 'DESCUENTO'
+                        THEN -a.monto
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS total_ajustes
+        FROM cuota c
+        LEFT JOIN ajuste a
+            ON a.cuota_id = c.id
+        WHERE c.id = %s
+        GROUP BY c.id, c.monto_base
+        """,
+        (cuota_id,)
+    )
+
+    resultado = cursor.fetchone()
+
+    if not resultado:
+        return None
+
+    return (
+        float(resultado["monto_base"])
+        + float(resultado["total_ajustes"])
+    )
 
 def crear_pago(pago, usuario_id):
     conexion = get_connection()
@@ -273,7 +313,6 @@ def editar_pago(pago_id, pago, usuario_id):
     try:
         cursor = conexion.cursor(dictionary=True)
 
-        # Buscar el pago y bloquear la cuota durante la edición
         cursor.execute(
             """
             SELECT
@@ -283,7 +322,6 @@ def editar_pago(pago_id, pago, usuario_id):
                 p.estado,
                 p.movimiento_id,
                 p.cuota_id,
-                c.monto_base,
                 c.monto_pendiente,
                 c.estado AS cuota_estado,
                 c.compra_tarjeta_id,
@@ -323,7 +361,6 @@ def editar_pago(pago_id, pago, usuario_id):
                 detail="El monto debe ser mayor a 0"
             )
 
-        # Validar que la suma de los métodos coincida con el pago
         monto_metodos = sum(
             metodo.monto
             for metodo in pago.metodos
@@ -335,7 +372,6 @@ def editar_pago(pago_id, pago, usuario_id):
                 detail="La suma de los métodos de pago debe coincidir con el monto del pago"
             )
 
-        # Validar montos individuales
         for metodo in pago.metodos:
             if metodo.monto <= 0:
                 raise HTTPException(
@@ -343,10 +379,8 @@ def editar_pago(pago_id, pago, usuario_id):
                     detail="El monto de cada método debe ser mayor a 0"
                 )
 
-        # Obtener la moneda de la cuota
         moneda = pago_actual["moneda"]
 
-        # Validar métodos de pago
         for metodo in pago.metodos:
             cursor.execute(
                 """
@@ -381,8 +415,6 @@ def editar_pago(pago_id, pago, usuario_id):
                     detail="Los métodos de pago deben utilizar la misma moneda que el pago"
                 )
 
-        # La cuota debe quedar con un pendiente válido.
-        # Primero devolvemos el monto anterior del pago.
         pendiente_sin_pago = (
             float(pago_actual["monto_pendiente"])
             + float(pago_actual["monto"])
@@ -398,7 +430,6 @@ def editar_pago(pago_id, pago, usuario_id):
                 detail="El nuevo monto supera el pendiente disponible de la cuota"
             )
 
-        # Reemplazar los métodos utilizados por el pago
         cursor.execute(
             """
             DELETE FROM movimiento_metodo
@@ -434,7 +465,6 @@ def editar_pago(pago_id, pago, usuario_id):
                 )
             )
 
-        # Actualizar el monto del movimiento
         cursor.execute(
             """
             UPDATE movimiento
@@ -450,7 +480,6 @@ def editar_pago(pago_id, pago, usuario_id):
             )
         )
 
-        # Actualizar el pago
         cursor.execute(
             """
             UPDATE pago
@@ -466,7 +495,6 @@ def editar_pago(pago_id, pago, usuario_id):
             )
         )
 
-        # Determinar nuevo estado de la cuota
         if nuevo_pendiente == 0:
             nuevo_estado = "PAGADA"
         else:
@@ -509,6 +537,7 @@ def editar_pago(pago_id, pago, usuario_id):
     finally:
         cursor.close()
         conexion.close()
+
 def anular_pago(pago_id, usuario_id):
     conexion = get_connection()
 
@@ -523,7 +552,6 @@ def anular_pago(pago_id, usuario_id):
                 p.estado,
                 p.movimiento_id,
                 p.cuota_id,
-                c.monto_base,
                 c.monto_pendiente,
                 c.estado AS cuota_estado
             FROM pago p
@@ -555,24 +583,23 @@ def anular_pago(pago_id, usuario_id):
                 detail="El pago ya está anulado"
             )
 
+        total_cuota = obtener_total_cuota(
+            cursor,
+            pago_actual["cuota_id"]
+        )
+
         nuevo_pendiente = (
             float(pago_actual["monto_pendiente"])
             + float(pago_actual["monto"])
         )
 
-        if nuevo_pendiente > float(
-            pago_actual["monto_base"]
-        ):
-            nuevo_pendiente = float(
-                pago_actual["monto_base"]
-            )
+        if nuevo_pendiente > total_cuota:
+            nuevo_pendiente = total_cuota
 
         if nuevo_pendiente == 0:
             nuevo_estado_cuota = "PAGADA"
 
-        elif nuevo_pendiente == float(
-            pago_actual["monto_base"]
-        ):
+        elif nuevo_pendiente == total_cuota:
             nuevo_estado_cuota = "PENDIENTE"
 
         else:
