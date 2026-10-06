@@ -333,16 +333,22 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
             return
         }
 
+        setError("")
+        setMensaje("")
+
         try {
             await anularPago(pago.id)
 
-            if (compraSeleccionada) {
+            setMensaje("Pago anulado correctamente")
+
+            if (compraSeleccionada !== null) {
                 await verCuotas(compraSeleccionada)
             }
-
         } catch (error) {
             if (error instanceof Error) {
                 setError(error.message)
+            } else {
+                setError("No se pudo anular el pago")
             }
         }
     }
@@ -745,6 +751,7 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                 </p>
 
                                 <button
+                                    type="button"
                                     onClick={function () {
                                         prepararEdicion(
                                             compra
@@ -755,6 +762,7 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                 </button>
 
                                 <button
+                                    type="button"
                                     onClick={function () {
                                         manejarEliminar(
                                             compra.id
@@ -765,6 +773,7 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                 </button>
 
                                 <button
+                                    type="button"
                                     onClick={function () {
                                         verCuotas(
                                             compra.id
@@ -888,22 +897,31 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
 
                                                                                 {pago.estado ===
                                                                                     "CONFIRMADO" && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={function () {
-                                                                                            manejarEditarPago(
-                                                                                                pago,
-                                                                                                cuota
-                                                                                            )
-                                                                                        }}
-                                                                                    >
-                                                                                        Editar pago
-                                                                                    </button>
-                                                                                )}
+                                                                                    <>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={function () {
+                                                                                                manejarEditarPago(
+                                                                                                    pago,
+                                                                                                    cuota
+                                                                                                )
+                                                                                            }}
+                                                                                        >
+                                                                                            Editar pago
+                                                                                        </button>
 
-                                                                                <button onClick={function () { manejarAnularPago(pago) }}>
-                                                                                        Anular pago
-                                                                                </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={function () {
+                                                                                                manejarAnularPago(
+                                                                                                    pago
+                                                                                                )
+                                                                                            }}
+                                                                                        >
+                                                                                            Anular pago
+                                                                                        </button>
+                                                                                    </>
+                                                                                )}
                                                                             </div>
                                                                         )
                                                                     }
@@ -913,6 +931,7 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
 
                                                         {puedePagar && (
                                                             <button
+                                                                type="button"
                                                                 onClick={function () {
                                                                     manejarPago(
                                                                         cuota

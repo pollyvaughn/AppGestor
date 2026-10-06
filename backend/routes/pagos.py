@@ -4,7 +4,8 @@ from backend.models.pago import PagoCrear
 from backend.services.pago_service import (
     crear_pago,
     editar_pago,
-    anular_pago
+    anular_pago,
+    listar_pagos_por_cuota
 )
 from backend.auth.dependencies import obtener_usuario_actual
 
