@@ -32,3 +32,77 @@ export async function crearPago(
 
     return await respuesta.json()
 }
+
+export async function editarPago(
+    pagoId: number,
+    cuotaId: number,
+    monto: number,
+    metodos: MetodoPago[]
+) {
+    const token = localStorage.getItem("token")
+
+    const respuesta = await fetch(`${API_URL}/pagos/${pagoId}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            cuota_id: cuotaId,
+            monto: monto,
+            metodos: metodos
+        })
+    })
+
+    if (!respuesta.ok) {
+        const error = await respuesta.json()
+        throw new Error(error.detail || "No se pudo editar el pago")
+    }
+
+    return await respuesta.json()
+}
+
+export async function listarPagosPorCuota(
+    cuotaId: number
+) {
+    const token = localStorage.getItem("token")
+
+    const respuesta = await fetch(
+        `${API_URL}/pagos/cuota/${cuotaId}`,
+        {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        }
+    )
+
+    if (!respuesta.ok) {
+        const error = await respuesta.json()
+        throw new Error(
+            error.detail || "No se pudieron obtener los pagos"
+        )
+    }
+
+    return await respuesta.json()
+}
+
+export async function anularPago(pagoId: number) {
+    const token = localStorage.getItem("token")
+
+    const respuesta = await fetch(
+        `${API_URL}/pagos/${pagoId}/anular`,
+        {
+            method: "PUT",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        }
+    )
+
+    if (!respuesta.ok) {
+        const error = await respuesta.json()
+        throw new Error(error.detail || "No se pudo anular el pago")
+    }
+
+    return await respuesta.json()
+}

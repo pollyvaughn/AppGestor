@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
+from backend.models.ajuste import AjusteCrear
 from backend.auth.dependencies import obtener_usuario_actual
 from backend.models.compra_tarjeta import CompraTarjetaCrear
 from backend.services.compra_tarjeta_service import (
@@ -7,7 +8,9 @@ from backend.services.compra_tarjeta_service import (
     listar_compras,
     listar_cuotas,
     editar_compra,
-    eliminar_compra
+    eliminar_compra,
+    crear_ajuste,
+    listar_ajustes
 )
 
 
@@ -43,6 +46,37 @@ def crear(
 def listar(usuario=Depends(obtener_usuario_actual)):
     return listar_compras(usuario["id"])
 
+
+@router.post("/cuota/{cuota_id}/ajustes")
+def agregar_ajuste(
+    cuota_id: int,
+    ajuste: AjusteCrear,
+    usuario=Depends(obtener_usuario_actual)
+):
+    try:
+        ajuste.cuota_id = cuota_id
+
+        return crear_ajuste(
+            ajuste,
+            usuario["id"]
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        )
+
+
+@router.get("/cuota/{cuota_id}/ajustes")
+def ajustes(
+    cuota_id: int,
+    usuario=Depends(obtener_usuario_actual)
+):
+    return listar_ajustes(
+        cuota_id,
+        usuario["id"]
+    )
 
 @router.get("/{compra_id}/cuotas")
 def cuotas(
