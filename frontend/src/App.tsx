@@ -3,6 +3,7 @@ import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
 import type { Usuario } from "./types/auth"
 import TarjetasYComprasPage from "./pages/TarjetasYComprasPage"
+import RecurrentesPage from "./pages/RecurrentesPage"
 
 export default function App() {
     const [usuario, setUsuario] = useState<Usuario | null>(function () {
@@ -60,6 +61,8 @@ export default function App() {
     return (
     <>
         <TarjetasYComprasPage />
+
+        <RecurrentesPage />
 
         <button onClick={cerrarSesion}>
             Cerrar sesión
