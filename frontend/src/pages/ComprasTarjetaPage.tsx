@@ -899,14 +899,11 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                                                                     >
                                                                                         Editar pago
                                                                                     </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={function () {
-                                                                                            manejarAnularPago(pago)
-                                                                                        }}>
-                                                                                            Anular pago
-                                                                                    </button>
                                                                                 )}
+
+                                                                                <button onClick={function () { manejarAnularPago(pago) }}>
+                                                                                        Anular pago
+                                                                                </button>
                                                                             </div>
                                                                         )
                                                                     }
