@@ -120,7 +120,7 @@ def crear_pago(pago, usuario_id):
             FROM cuota
             WHERE compra_tarjeta_id = %s
               AND numero < %s
-              AND estado != 'PAGADA'
+              AND estado NOT IN ('PAGADA', 'OMITIDA')
             LIMIT 1
             """,
             (
