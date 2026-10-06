@@ -509,6 +509,156 @@ def editar_pago(pago_id, pago, usuario_id):
     finally:
         cursor.close()
         conexion.close()
+def anular_pago(pago_id, usuario_id):
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT
+                p.id,
+                p.monto,
+                p.estado,
+                p.movimiento_id,
+                p.cuota_id,
+                c.monto_base,
+                c.monto_pendiente,
+                c.estado AS cuota_estado
+            FROM pago p
+            INNER JOIN movimiento m
+                ON p.movimiento_id = m.id
+            INNER JOIN cuota c
+                ON p.cuota_id = c.id
+            WHERE p.id = %s
+              AND m.usuario_id = %s
+            FOR UPDATE
+            """,
+            (
+                pago_id,
+                usuario_id
+            )
+        )
+
+        pago_actual = cursor.fetchone()
+
+        if not pago_actual:
+            raise HTTPException(
+                status_code=404,
+                detail="Pago no encontrado"
+            )
+
+        if pago_actual["estado"] == "ANULADO":
+            raise HTTPException(
+                status_code=400,
+                detail="El pago ya está anulado"
+            )
+
+        nuevo_pendiente = (
+            float(pago_actual["monto_pendiente"])
+            + float(pago_actual["monto"])
+        )
+
+        if nuevo_pendiente > float(
+            pago_actual["monto_base"]
+        ):
+            nuevo_pendiente = float(
+                pago_actual["monto_base"]
+            )
+
+        if nuevo_pendiente == 0:
+            nuevo_estado_cuota = "PAGADA"
+
+        elif nuevo_pendiente == float(
+            pago_actual["monto_base"]
+        ):
+            nuevo_estado_cuota = "PENDIENTE"
+
+        else:
+            nuevo_estado_cuota = "PARCIAL"
+
+        cursor.execute(
+            """
+            UPDATE pago
+            SET estado = 'ANULADO'
+            WHERE id = %s
+            """,
+            (
+                pago_id,
+            )
+        )
+
+        cursor.execute(
+            """
+            UPDATE movimiento
+            SET estado = 'ANULADO'
+            WHERE id = %s
+            """,
+            (
+                pago_actual["movimiento_id"],
+            )
+        )
+
+        cursor.execute(
+            """
+            UPDATE cuota
+            SET
+                monto_pendiente = %s,
+                estado = %s
+            WHERE id = %s
+            """,
+            (
+                nuevo_pendiente,
+                nuevo_estado_cuota,
+                pago_actual["cuota_id"]
+            )
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO anulacion
+            (
+                movimiento_id,
+                pago_id,
+                motivo,
+                fecha
+            )
+            VALUES (
+                NULL,
+                %s,
+                %s,
+                NOW()
+            )
+            """,
+            (
+                pago_id,
+                "Pago anulado"
+            )
+        )
+
+        conexion.commit()
+
+        return {
+            "mensaje": "Pago anulado correctamente",
+            "pago_id": pago_id,
+            "cuota_id": pago_actual["cuota_id"],
+            "monto_reintegrado": pago_actual["monto"],
+            "monto_pendiente": nuevo_pendiente,
+            "estado": nuevo_estado_cuota
+        }
+
+    except HTTPException:
+        conexion.rollback()
+        raise
+
+    except Exception:
+        conexion.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conexion.close()
 
 def listar_pagos_por_cuota(cuota_id, usuario_id):
     conexion = get_connection()

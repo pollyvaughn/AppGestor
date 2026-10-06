@@ -10,7 +10,8 @@ import {
 import {
     crearPago,
     editarPago,
-    listarPagosPorCuota
+    listarPagosPorCuota,
+    anularPago
 } from "../services/pagoService"
 
 import { listarMetodosPago } from "../services/metodoPagoService"
@@ -321,6 +322,29 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
         }
 
         setMostrarConfirmacion(false)
+    }
+
+    async function manejarAnularPago(pago: Pago) {
+        const confirmar = window.confirm(
+            "¿Seguro que querés anular este pago?"
+        )
+
+        if (!confirmar) {
+            return
+        }
+
+        try {
+            await anularPago(pago.id)
+
+            if (compraSeleccionada) {
+                await verCuotas(compraSeleccionada)
+            }
+
+        } catch (error) {
+            if (error instanceof Error) {
+                setError(error.message)
+            }
+        }
     }
 
     function cancelarPago() {
@@ -874,6 +898,13 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
                                                                                         }}
                                                                                     >
                                                                                         Editar pago
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={function () {
+                                                                                            manejarAnularPago(pago)
+                                                                                        }}>
+                                                                                            Anular pago
                                                                                     </button>
                                                                                 )}
                                                                             </div>

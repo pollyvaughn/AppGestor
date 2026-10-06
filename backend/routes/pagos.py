@@ -4,7 +4,7 @@ from backend.models.pago import PagoCrear
 from backend.services.pago_service import (
     crear_pago,
     editar_pago,
-    listar_pagos_por_cuota
+    anular_pago
 )
 from backend.auth.dependencies import obtener_usuario_actual
 
@@ -35,6 +35,15 @@ def actualizar_pago(
         usuario["id"]
     )
 
+@router.put("/{pago_id}/anular")
+def cancelar_pago(
+    pago_id: int,
+    usuario=Depends(obtener_usuario_actual)
+):
+    return anular_pago(
+        pago_id,
+        usuario["id"]
+    )
 
 @router.get("/cuota/{cuota_id}")
 def listar_pagos(
