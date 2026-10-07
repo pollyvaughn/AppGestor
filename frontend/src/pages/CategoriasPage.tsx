@@ -9,6 +9,7 @@ import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 import Modal from "../components/ui/Modal"
 import Select from "../components/ui/Select"
+import ColorPicker from "../components/ui/ColorPicker"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -275,29 +276,13 @@ export default function CategoriasPage() {
                         <option value="INGRESO">Ingreso</option>
                     </Select>
 
-                    <div>
-                        <label
-                            htmlFor="color"
-                            className="block text-xs mb-1.5"
-                            style={{
-                                color: "var(--color-muted-foreground)",
-                                fontFamily: "var(--font-mono)",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.08em",
-                            }}
-                        >
-                            Color
-                        </label>
-
-                        <input
-                            id="color"
-                            type="color"
-                            value={formulario.color}
-                            onChange={function (e) {
-                                setFormulario({ ...formulario, color: e.target.value })
-                            }}
-                        />
-                    </div>
+                    <ColorPicker
+                        label="Color"
+                        value={formulario.color}
+                        onChange={function (color) {
+                            setFormulario({ ...formulario, color: color })
+                        }}
+                    />
 
                     {error && (
                         <p
