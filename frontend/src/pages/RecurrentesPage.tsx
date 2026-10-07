@@ -7,7 +7,7 @@ import {
     generarMovimiento
 } from "../services/recurrenteService"
 import { listarCategorias } from "../services/categoriaService"
-import { listarMetodosPago } from "../services/metodoPagoService"
+import { listarCuentas } from "../services/cuentaService"
 
 type Recurrente = {
     id: number
@@ -92,7 +92,7 @@ export default function RecurrentesPage() {
     async function cargarOpciones() {
         try {
             const categoriasDatos = await listarCategorias()
-            const metodosDatos = await listarMetodosPago()
+            const metodosDatos = await listarCuentas()
 
             setCategorias(categoriasDatos)
             setMetodosPago(metodosDatos)

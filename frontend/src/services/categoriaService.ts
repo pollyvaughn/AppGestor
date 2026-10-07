@@ -1,22 +1,17 @@
-const API_URL = "http://127.0.0.1:8000"
+import { api } from "../lib/api"
 
-function obtenerHeaders() {
-    const token = localStorage.getItem("token")
-
-    return {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-    }
+export function listarCategorias() {
+    return api("/categorias/")
 }
 
-export async function listarCategorias() {
-    const respuesta = await fetch(`${API_URL}/categorias/`, {
-        headers: obtenerHeaders()
-    })
+export function crearCategoria(datos: object) {
+    return api("/categorias/", { method: "POST", body: datos })
+}
 
-    if (!respuesta.ok) {
-        throw new Error("No se pudieron obtener las categorías")
-    }
+export function editarCategoria(id: number, datos: object) {
+    return api(`/categorias/${id}`, { method: "PUT", body: datos })
+}
 
-    return respuesta.json()
+export function eliminarCategoria(id: number) {
+    return api(`/categorias/${id}`, { method: "DELETE" })
 }

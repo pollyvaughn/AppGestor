@@ -2,8 +2,14 @@ import { useState } from "react"
 import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
 import type { Usuario } from "./types/auth"
+import Layout from "./components/layout/Layout"
+import type { Vista } from "./components/layout/Layout"
+import GlobalPage from "./pages/GlobalPage"
+import MensualPage from "./pages/MensualPage"
 import TarjetasYComprasPage from "./pages/TarjetasYComprasPage"
 import RecurrentesPage from "./pages/RecurrentesPage"
+import CategoriasPage from "./pages/CategoriasPage"
+import CuentasPage from "./pages/CuentasPage"
 
 export default function App() {
     const [usuario, setUsuario] = useState<Usuario | null>(function () {
@@ -17,6 +23,7 @@ export default function App() {
     })
 
     const [mostrarRegistro, setMostrarRegistro] = useState(false)
+    const [vista, setVista] = useState<Vista>("mensual")
 
     function cerrarSesion() {
         localStorage.removeItem("token")
@@ -24,49 +31,42 @@ export default function App() {
         setUsuario(null)
     }
 
-    function iniciarSesion(usuario: Usuario) {
-        setUsuario(usuario)
-    }
-
-    function irARegistro() {
-        setMostrarRegistro(true)
-    }
-
-    function irALogin() {
-        setMostrarRegistro(false)
-    }
-
-    function registroExitoso() {
-        setMostrarRegistro(false)
-    }
-
     if (!usuario) {
         if (mostrarRegistro) {
             return (
                 <RegisterPage
-                    onRegister={registroExitoso}
-                    onLogin={irALogin}
-                 />
+                    onRegister={function () {
+                        setMostrarRegistro(false)
+                    }}
+                    onLogin={function () {
+                        setMostrarRegistro(false)
+                    }}
+                />
             )
         }
 
         return (
             <LoginPage
-                onLogin={iniciarSesion}
-                onRegister={irARegistro}
+                onLogin={setUsuario}
+                onRegister={function () {
+                    setMostrarRegistro(true)
+                }}
             />
-)
+        )
     }
 
     return (
-    <>
-        <TarjetasYComprasPage />
-
-        <RecurrentesPage />
-
-        <button onClick={cerrarSesion}>
-            Cerrar sesión
-        </button>
-    </>
+        <Layout
+            vista={vista}
+            onCambiarVista={setVista}
+            onCerrarSesion={cerrarSesion}
+        >
+            {vista === "global" && <GlobalPage />}
+            {vista === "mensual" && <MensualPage />}
+            {vista === "tarjetas" && <TarjetasYComprasPage />}
+            {vista === "recurrentes" && <RecurrentesPage />}
+            {vista === "categorias" && <CategoriasPage />}
+            {vista === "cuentas" && <CuentasPage />}
+        </Layout>
     )
 }

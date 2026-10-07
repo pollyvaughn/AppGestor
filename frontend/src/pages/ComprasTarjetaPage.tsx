@@ -14,7 +14,7 @@ import {
     anularPago
 } from "../services/pagoService"
 
-import { listarMetodosPago } from "../services/metodoPagoService"
+import { listarCuentas } from "../services/cuentaService"
 
 type Compra = {
     id: number
@@ -125,7 +125,7 @@ export default function ComprasTarjetaPage({ tarjetas }: Props) {
 
     async function cargarMetodosPago() {
         try {
-            const datos = await listarMetodosPago()
+            const datos = await listarCuentas()
             setMetodosPago(datos)
         } catch {
             setError("No se pudieron cargar los métodos de pago")

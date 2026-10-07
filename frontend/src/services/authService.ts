@@ -1,45 +1,20 @@
+import { api } from "../lib/api"
 import type {
     LoginRequest,
     LoginResponse,
     RegisterRequest,
 } from "../types/auth"
 
-const API_URL = "http://127.0.0.1:8000"
-
-export async function iniciarSesion(
-    datos: LoginRequest
-): Promise<LoginResponse> {
-    const respuesta = await fetch(`${API_URL}/auth/login`, {
+export function iniciarSesion(datos: LoginRequest) {
+    return api<LoginResponse>("/auth/login", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(datos),
+        body: datos,
     })
-
-    const resultado = await respuesta.json()
-
-    if (!respuesta.ok) {
-        throw new Error(resultado.detail || "Error al iniciar sesión")
-    }
-
-    return resultado
 }
 
-export async function registrarUsuario(
-    datos: RegisterRequest
-): Promise<void> {
-    const respuesta = await fetch(`${API_URL}/usuarios/`, {
+export async function registrarUsuario(datos: RegisterRequest) {
+    await api("/usuarios/", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(datos),
+        body: datos,
     })
-
-    const resultado = await respuesta.json()
-
-    if (!respuesta.ok) {
-        throw new Error(resultado.detail || "Error al registrar usuario")
-    }
 }

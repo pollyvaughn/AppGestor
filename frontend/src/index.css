@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+@theme inline {
+  --font-sans: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  --color-background: #F5F4F1;
+  --color-foreground: #1C1C1A;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1C1C1A;
+  --color-muted: #F0EDE8;
+  --color-muted-foreground: #7A7873;
+  --color-border: #E4E1DB;
+  --color-primary: #1C1C1A;
+  --color-primary-foreground: #F5F4F1;
+  --color-income: #2A6049;
+  --color-income-bg: #EAF2EE;
+  --color-expense: #9A3223;
+  --color-expense-bg: #F5EAE8;
+  --color-accent: #C8B89A;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbars by default */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
