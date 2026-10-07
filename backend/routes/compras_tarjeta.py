@@ -8,9 +8,13 @@ from backend.services.compra_tarjeta_service import (
     listar_compras,
     listar_cuotas,
     editar_compra,
-    eliminar_compra,
+    eliminar_compra
+)
+
+from backend.services.ajuste_service import (
     crear_ajuste,
-    listar_ajustes
+    listar_ajustes,
+    anular_ajuste
 )
 
 
@@ -77,6 +81,23 @@ def ajustes(
         cuota_id,
         usuario["id"]
     )
+
+@router.delete("/ajuste/{ajuste_id}")
+def anular_ajuste_route(
+    ajuste_id: int,
+    usuario=Depends(obtener_usuario_actual)
+):
+    try:
+        return anular_ajuste(
+            ajuste_id,
+            usuario["id"]
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        )
 
 @router.get("/{compra_id}/cuotas")
 def cuotas(

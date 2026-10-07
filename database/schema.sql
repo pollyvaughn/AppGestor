@@ -419,6 +419,11 @@ CREATE TABLE ajuste (
 
     descripcion VARCHAR(255),
 
+    estado ENUM(
+    'ACTIVO',
+    'ANULADO'
+    ) NOT NULL DEFAULT 'ACTIVO',
+
     fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_ajuste_cuota
@@ -576,6 +581,8 @@ CREATE TABLE anulacion (
 
     pago_id INT,
 
+    ajuste_id INT,
+
     motivo VARCHAR(255),
 
     fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -588,11 +595,17 @@ CREATE TABLE anulacion (
         FOREIGN KEY (pago_id)
         REFERENCES pago(id),
 
+    CONSTRAINT fk_anulacion_ajuste
+        FOREIGN KEY (ajuste_id)
+        REFERENCES ajuste(id),
+
     CONSTRAINT chk_anulacion_destino
         CHECK (
-            (movimiento_id IS NOT NULL AND pago_id IS NULL)
+            (movimiento_id IS NOT NULL AND pago_id IS NULL AND ajuste_id IS NULL)
             OR
-            (movimiento_id IS NULL AND pago_id IS NOT NULL)
+            (movimiento_id IS NULL AND pago_id IS NOT NULL AND ajuste_id IS NULL)
+            OR
+            (movimiento_id IS NULL AND pago_id IS NULL AND ajuste_id IS NOT NULL)
         )
 );
 

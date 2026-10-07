@@ -1,4 +1,6 @@
 from backend.database import get_connection
+from fastapi import HTTPException
+
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
@@ -338,7 +340,6 @@ def eliminar_compra(compra_id, usuario_id):
 
     try:
         cursor = conexion.cursor(dictionary=True)
-
         conexion.start_transaction()
 
         cursor.execute(
@@ -351,11 +352,9 @@ def eliminar_compra(compra_id, usuario_id):
                 ON ct.movimiento_id = m.id
             WHERE ct.id = %s
             AND m.usuario_id = %s
+            AND m.estado != 'ANULADO'
             """,
-            (
-                compra_id,
-                usuario_id
-            )
+            (compra_id, usuario_id)
         )
 
         compra = cursor.fetchone()
@@ -365,7 +364,30 @@ def eliminar_compra(compra_id, usuario_id):
 
         cursor.execute(
             """
-            DELETE FROM cuota
+            SELECT COUNT(*) AS total
+            FROM pago p
+            INNER JOIN cuota c
+                ON p.cuota_id = c.id
+            WHERE c.compra_tarjeta_id = %s
+            AND p.estado = 'CONFIRMADO'
+            """,
+            (compra_id,)
+        )
+
+        pagos = cursor.fetchone()
+
+        if pagos["total"] > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede anular la compra porque tiene pagos confirmados"
+            )
+
+        cursor.execute(
+            """
+            UPDATE cuota
+            SET
+                estado = 'ANULADA',
+                monto_pendiente = 0
             WHERE compra_tarjeta_id = %s
             """,
             (compra_id,)
@@ -373,21 +395,32 @@ def eliminar_compra(compra_id, usuario_id):
 
         cursor.execute(
             """
-            DELETE FROM compra_tarjeta
+            UPDATE movimiento
+            SET estado = 'ANULADO'
             WHERE id = %s
+            AND usuario_id = %s
             """,
-            (compra_id,)
+            (compra["movimiento_id"], usuario_id)
         )
 
         cursor.execute(
             """
-            DELETE FROM movimiento
-            WHERE id = %s
-            AND usuario_id = %s
+            INSERT INTO anulacion (
+                movimiento_id,
+                pago_id,
+                motivo,
+                fecha
+            )
+            VALUES (
+                %s,
+                NULL,
+                %s,
+                NOW()
+            )
             """,
             (
                 compra["movimiento_id"],
-                usuario_id
+                "Compra de tarjeta anulada"
             )
         )
 
@@ -398,213 +431,6 @@ def eliminar_compra(compra_id, usuario_id):
     except Exception:
         conexion.rollback()
         raise
-
-    finally:
-        cursor.close()
-        conexion.close()
-
-def crear_ajuste(ajuste, usuario_id):
-    conexion = get_connection()
-
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        conexion.start_transaction()
-
-        cursor.execute(
-            """
-            SELECT
-                c.id,
-                mp.moneda
-            FROM cuota c
-            INNER JOIN compra_tarjeta ct
-                ON c.compra_tarjeta_id = ct.id
-            INNER JOIN movimiento m
-                ON ct.movimiento_id = m.id
-            INNER JOIN tarjeta_credito tc
-                ON ct.tarjeta_id = tc.id
-            INNER JOIN metodo_pago mp
-                ON tc.metodo_pago_id = mp.id
-            WHERE c.id = %s
-            AND m.usuario_id = %s
-            """,
-            (ajuste.cuota_id, usuario_id)
-        )
-
-        cuota = cursor.fetchone()
-
-        if not cuota:
-            raise ValueError("Cuota no encontrada")
-
-        if ajuste.tipo not in (
-            "RECARGO",
-            "INTERES",
-            "COMISION",
-            "DESCUENTO",
-            "ADICIONAL"
-        ):
-            raise ValueError("Tipo de ajuste inválido")
-
-        if ajuste.monto <= 0:
-            raise ValueError("El monto del ajuste debe ser mayor a 0")
-
-        cursor.execute(
-            """
-            INSERT INTO ajuste
-            (
-                cuota_id,
-                tipo,
-                monto,
-                moneda,
-                descripcion
-            )
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            (
-                ajuste.cuota_id,
-                ajuste.tipo,
-                ajuste.monto,
-                cuota["moneda"],
-                ajuste.descripcion
-            )
-        )
-
-        ajuste_id = cursor.lastrowid
-
-        cursor.execute(
-            """
-            SELECT
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN tipo IN (
-                                'RECARGO',
-                                'INTERES',
-                                'COMISION',
-                                'ADICIONAL'
-                            )
-                            THEN monto
-                            WHEN tipo = 'DESCUENTO'
-                            THEN -monto
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) AS total_ajustes
-            FROM ajuste
-            WHERE cuota_id = %s
-            """,
-            (ajuste.cuota_id,)
-        )
-
-        resultado = cursor.fetchone()
-
-        total_ajustes = resultado["total_ajustes"]
-
-        cursor.execute(
-            """
-            SELECT
-                monto_base
-            FROM cuota
-            WHERE id = %s
-            """,
-            (ajuste.cuota_id,)
-        )
-
-        cuota_base = cursor.fetchone()
-
-        total_cuota = cuota_base["monto_base"] + total_ajustes
-
-        cursor.execute(
-            """
-            SELECT
-                COALESCE(SUM(monto), 0) AS total_pagado
-            FROM pago
-            WHERE cuota_id = %s
-            AND estado = 'CONFIRMADO'
-            """,
-            (ajuste.cuota_id,)
-        )
-
-        pagos = cursor.fetchone()
-
-        total_pagado = pagos["total_pagado"]
-
-        monto_pendiente = total_cuota - total_pagado
-
-        if monto_pendiente < 0:
-            monto_pendiente = 0
-
-        estado = "PAGADA" if monto_pendiente == 0 else (
-            "PARCIAL" if total_pagado > 0 else "PENDIENTE"
-        )
-
-        cursor.execute(
-            """
-            UPDATE cuota
-            SET
-                monto_pendiente = %s,
-                estado = %s
-            WHERE id = %s
-            """,
-            (
-                monto_pendiente,
-                estado,
-                ajuste.cuota_id
-            )
-        )
-
-        conexion.commit()
-
-        return {
-            "id": ajuste_id,
-            "cuota_id": ajuste.cuota_id,
-            "tipo": ajuste.tipo,
-            "monto": ajuste.monto,
-            "descripcion": ajuste.descripcion,
-            "total_cuota": total_cuota,
-            "monto_pendiente": monto_pendiente
-        }
-
-    except Exception:
-        conexion.rollback()
-        raise
-
-    finally:
-        cursor.close()
-        conexion.close()
-
-
-def listar_ajustes(cuota_id, usuario_id):
-    conexion = get_connection()
-
-    try:
-        cursor = conexion.cursor(dictionary=True)
-
-        cursor.execute(
-            """
-            SELECT
-                a.id,
-                a.cuota_id,
-                a.tipo,
-                a.monto,
-                a.moneda,
-                a.descripcion,
-                a.fecha
-            FROM ajuste a
-            INNER JOIN cuota c
-                ON a.cuota_id = c.id
-            INNER JOIN compra_tarjeta ct
-                ON c.compra_tarjeta_id = ct.id
-            INNER JOIN movimiento m
-                ON ct.movimiento_id = m.id
-            WHERE a.cuota_id = %s
-            AND m.usuario_id = %s
-            ORDER BY a.fecha DESC
-            """,
-            (cuota_id, usuario_id)
-        )
-
-        return cursor.fetchall()
 
     finally:
         cursor.close()
