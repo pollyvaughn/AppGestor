@@ -8,6 +8,7 @@ import {
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 import Modal from "../components/ui/Modal"
+import Select from "../components/ui/Select"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -235,7 +236,7 @@ export default function CategoriasPage() {
                 </p>
             )}
 
-            <div className="grid gap-6" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
                 {renderLista("Egresos", "EGRESO")}
                 {renderLista("Ingresos", "INGRESO")}
             </div>
@@ -259,40 +260,20 @@ export default function CategoriasPage() {
                         autoFocus
                     />
 
-                    <div>
-                        <label
-                            htmlFor="tipo"
-                            className="block text-xs mb-1.5"
-                            style={{
-                                color: "var(--color-muted-foreground)",
-                                fontFamily: "var(--font-mono)",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.08em",
-                            }}
-                        >
-                            Tipo
-                        </label>
-
-                        <select
-                            id="tipo"
-                            value={formulario.tipo}
-                            onChange={function (e) {
-                                setFormulario({
-                                    ...formulario,
-                                    tipo: e.target.value as Tipo,
-                                })
-                            }}
-                            className="w-full px-2.5 py-2 text-sm"
-                            style={{
-                                background: "var(--color-muted)",
-                                border: "1px solid var(--color-border)",
-                                borderRadius: "var(--radius-sm)",
-                            }}
-                        >
-                            <option value="EGRESO">Egreso</option>
-                            <option value="INGRESO">Ingreso</option>
-                        </select>
-                    </div>
+                    <Select
+                        id="tipo"
+                        label="Tipo"
+                        value={formulario.tipo}
+                        onChange={function (e) {
+                            setFormulario({
+                                ...formulario,
+                                tipo: e.target.value as Tipo,
+                            })
+                        }}
+                    >
+                        <option value="EGRESO">Egreso</option>
+                        <option value="INGRESO">Ingreso</option>
+                    </Select>
 
                     <div>
                         <label

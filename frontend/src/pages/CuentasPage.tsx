@@ -10,6 +10,7 @@ import Input from "../components/ui/Input"
 import Modal from "../components/ui/Modal"
 import MontoInput from "../components/ui/MontoInput"
 import { formatearMonto } from "../lib/moneda"
+import Select from "../components/ui/Select"
 
 type TipoCuenta =
     | "EFECTIVO"
@@ -52,19 +53,6 @@ const formularioInicial: Formulario = {
     nombre: "",
     moneda: "PYG",
     saldo: "0",
-}
-
-const estiloEtiqueta: React.CSSProperties = {
-    color: "var(--color-muted-foreground)",
-    fontFamily: "var(--font-mono)",
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-}
-
-const estiloSelect: React.CSSProperties = {
-    background: "var(--color-muted)",
-    border: "1px solid var(--color-border)",
-    borderRadius: "var(--radius-sm)",
 }
 
 export default function CuentasPage() {
@@ -303,36 +291,25 @@ export default function CuentasPage() {
                 }}
             >
                 <form onSubmit={guardar} className="space-y-4">
-                    <div>
-                        <label
-                            htmlFor="tipo"
-                            className="block text-xs mb-1.5"
-                            style={estiloEtiqueta}
-                        >
-                            Tipo
-                        </label>
-
-                        <select
-                            id="tipo"
-                            value={formulario.tipo}
-                            onChange={function (e) {
-                                setFormulario({
-                                    ...formulario,
-                                    tipo: e.target.value as TipoCuenta,
-                                })
-                            }}
-                            className="w-full px-2.5 py-2 text-sm"
-                            style={estiloSelect}
-                        >
-                            {TIPOS_CREABLES.map(function (tipo) {
-                                return (
-                                    <option key={tipo} value={tipo}>
-                                        {ETIQUETAS[tipo]}
-                                    </option>
-                                )
-                            })}
-                        </select>
-                    </div>
+                    <Select
+                        id="tipo"
+                        label="Tipo"
+                        value={formulario.tipo}
+                        onChange={function (e) {
+                            setFormulario({
+                                ...formulario,
+                                tipo: e.target.value as TipoCuenta,
+                            })
+                        }}
+                    >
+                        {TIPOS_CREABLES.map(function (tipo) {
+                            return (
+                                <option key={tipo} value={tipo}>
+                                    {ETIQUETAS[tipo]}
+                                </option>
+                            )
+                        })}
+                    </Select>
 
                     <Input
                         id="nombre"
@@ -350,42 +327,31 @@ export default function CuentasPage() {
                     />
 
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label
-                                htmlFor="moneda"
-                                className="block text-xs mb-1.5"
-                                style={estiloEtiqueta}
-                            >
-                                Moneda
-                            </label>
+                        <Select
+                            id="moneda"
+                            label="Moneda"
+                            value={formulario.moneda}
+                            onChange={function (e) {
+                                const moneda = e.target.value
 
-                            <select
-                                id="moneda"
-                                value={formulario.moneda}
-                                onChange={function (e) {
-                                    const moneda = e.target.value
-
-                                    setFormulario({
-                                        ...formulario,
-                                        moneda: moneda,
-                                        saldo:
-                                            moneda === "PYG"
-                                                ? String(Math.trunc(Number(formulario.saldo || 0)))
-                                                : formulario.saldo,
-                                    })
-                                }}
-                                className="w-full px-2.5 py-2 text-sm"
-                                style={estiloSelect}
-                            >
-                                {MONEDAS.map(function (moneda) {
-                                    return (
-                                        <option key={moneda} value={moneda}>
-                                            {moneda}
-                                        </option>
-                                    )
-                                })}
-                            </select>
-                        </div>
+                                setFormulario({
+                                    ...formulario,
+                                    moneda: moneda,
+                                    saldo:
+                                        moneda === "PYG"
+                                            ? String(Math.trunc(Number(formulario.saldo || 0)))
+                                            : formulario.saldo,
+                                })
+                            }}
+                        >
+                            {MONEDAS.map(function (moneda) {
+                                return (
+                                    <option key={moneda} value={moneda}>
+                                        {moneda}
+                                    </option>
+                                )
+                            })}
+                        </Select>
 
                         <MontoInput
                             id="saldo"
