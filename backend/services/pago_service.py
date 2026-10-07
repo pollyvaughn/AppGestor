@@ -1,6 +1,8 @@
 from fastapi import HTTPException
 from backend.database import get_connection
 
+from backend.services.saldo_service import actualizar_saldo, revertir_saldo
+
 def obtener_total_cuota(cursor, cuota_id):
     cursor.execute(
         """
@@ -140,7 +142,7 @@ def crear_pago(pago, usuario_id):
         for metodo in pago.metodos:
             cursor.execute(
                 """
-                SELECT id, estado, moneda
+                SELECT id, tipo, estado, moneda
                 FROM metodo_pago
                 WHERE id = %s
                   AND usuario_id = %s
@@ -163,6 +165,12 @@ def crear_pago(pago, usuario_id):
                 raise HTTPException(
                     status_code=400,
                     detail="Uno de los métodos de pago está inactivo"
+                )
+
+            if metodo_pago["tipo"] == "TARJETA_CREDITO":
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se puede pagar una tarjeta de crédito usando otra tarjeta de crédito"
                 )
 
             if metodo_pago["moneda"] != cuota["moneda"]:
@@ -258,6 +266,14 @@ def crear_pago(pago, usuario_id):
                     metodo.monto,
                     cuota["moneda"]
                 )
+            )
+
+        for metodo in pago.metodos:
+            actualizar_saldo(
+                cursor,
+                metodo.metodo_pago_id,
+                metodo.monto,
+                "EGRESO"
             )
 
         nuevo_pendiente = (
@@ -384,7 +400,7 @@ def editar_pago(pago_id, pago, usuario_id):
         for metodo in pago.metodos:
             cursor.execute(
                 """
-                SELECT id, estado, moneda
+                SELECT id, tipo, estado, moneda
                 FROM metodo_pago
                 WHERE id = %s
                   AND usuario_id = %s
@@ -409,6 +425,12 @@ def editar_pago(pago_id, pago, usuario_id):
                     detail="Uno de los métodos de pago está inactivo"
                 )
 
+            if metodo_pago["tipo"] == "TARJETA_CREDITO":
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se puede pagar una tarjeta de crédito usando otra tarjeta de crédito"
+                )
+
             if metodo_pago["moneda"] != moneda:
                 raise HTTPException(
                     status_code=400,
@@ -428,6 +450,27 @@ def editar_pago(pago_id, pago, usuario_id):
             raise HTTPException(
                 status_code=400,
                 detail="El nuevo monto supera el pendiente disponible de la cuota"
+            )
+
+        cursor.execute(
+            """
+            SELECT metodo_pago_id, monto
+            FROM movimiento_metodo
+            WHERE movimiento_id = %s
+            """,
+            (
+                pago_actual["movimiento_id"],
+            )
+        )
+
+        metodos_actuales = cursor.fetchall()
+
+        for metodo in metodos_actuales:
+            revertir_saldo(
+                cursor,
+                metodo["metodo_pago_id"],
+                metodo["monto"],
+                "EGRESO"
             )
 
         cursor.execute(
@@ -463,6 +506,14 @@ def editar_pago(pago_id, pago, usuario_id):
                     metodo.monto,
                     moneda
                 )
+            )
+
+        for metodo in pago.metodos:
+            actualizar_saldo(
+                cursor,
+                metodo.metodo_pago_id,
+                metodo.monto,
+                "EGRESO"
             )
 
         cursor.execute(
@@ -604,6 +655,27 @@ def anular_pago(pago_id, usuario_id):
 
         else:
             nuevo_estado_cuota = "PARCIAL"
+
+        cursor.execute(
+            """
+            SELECT metodo_pago_id, monto
+            FROM movimiento_metodo
+            WHERE movimiento_id = %s
+            """,
+            (
+                pago_actual["movimiento_id"],
+            )
+        )
+
+        metodos_pago = cursor.fetchall()
+
+        for metodo in metodos_pago:
+            revertir_saldo(
+                cursor,
+                metodo["metodo_pago_id"],
+                metodo["monto"],
+                "EGRESO"
+            )
 
         cursor.execute(
             """

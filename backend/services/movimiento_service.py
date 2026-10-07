@@ -1,4 +1,5 @@
 from backend.database import get_connection
+from backend.services.saldo_service import actualizar_saldo, revertir_saldo
 
 
 def crear_movimiento(movimiento, usuario_id):
@@ -70,9 +71,23 @@ def crear_movimiento(movimiento, usuario_id):
         )
 
         cursor.execute(sql, valores)
+
+        # Actualizar saldo del método de pago
+        if movimiento.metodo_pago_id is not None:
+            actualizar_saldo(
+                cursor,
+                movimiento.metodo_pago_id,
+                movimiento.monto,
+                movimiento.tipo
+            )
+
         conexion.commit()
 
         return cursor.lastrowid, None
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()
@@ -123,6 +138,23 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
     try:
         cursor = conexion.cursor(dictionary=True)
 
+        # Obtener movimiento actual
+        cursor.execute(
+            """
+            SELECT metodo_pago_id, tipo, monto
+            FROM movimiento
+            WHERE id = %s
+            AND usuario_id = %s
+            AND estado != 'ANULADO'
+            """,
+            (movimiento_id, usuario_id)
+        )
+
+        movimiento_actual = cursor.fetchone()
+
+        if not movimiento_actual:
+            return False, "Movimiento no encontrado"
+
         # Verificar categoría
         if movimiento.categoria_id is not None:
             cursor.execute(
@@ -155,6 +187,16 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
             if not cursor.fetchone():
                 return False, "Método de pago no encontrado"
 
+        # Revertir efecto del movimiento anterior
+        if movimiento_actual["metodo_pago_id"] is not None:
+            revertir_saldo(
+                cursor,
+                movimiento_actual["metodo_pago_id"],
+                movimiento_actual["monto"],
+                movimiento_actual["tipo"]
+            )
+
+        # Actualizar movimiento
         sql = """
             UPDATE movimiento
             SET categoria_id = %s,
@@ -184,12 +226,23 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
         )
 
         cursor.execute(sql, valores)
+
+        # Aplicar efecto del nuevo movimiento
+        if movimiento.metodo_pago_id is not None:
+            actualizar_saldo(
+                cursor,
+                movimiento.metodo_pago_id,
+                movimiento.monto,
+                movimiento.tipo
+            )
+
         conexion.commit()
 
-        if cursor.rowcount == 0:
-            return False, "Movimiento no encontrado"
-
         return True, None
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()
@@ -200,20 +253,53 @@ def eliminar_movimiento(movimiento_id, usuario_id):
     conexion = get_connection()
 
     try:
-        cursor = conexion.cursor()
+        cursor = conexion.cursor(dictionary=True)
 
-        sql = """
+        # Obtener movimiento actual
+        cursor.execute(
+            """
+            SELECT metodo_pago_id, tipo, monto
+            FROM movimiento
+            WHERE id = %s
+            AND usuario_id = %s
+            AND estado != 'ANULADO'
+            """,
+            (movimiento_id, usuario_id)
+        )
+
+        movimiento = cursor.fetchone()
+
+        if not movimiento:
+            return 0
+
+        # Revertir efecto del movimiento
+        if movimiento["metodo_pago_id"] is not None:
+            revertir_saldo(
+                cursor,
+                movimiento["metodo_pago_id"],
+                movimiento["monto"],
+                movimiento["tipo"]
+            )
+
+        # Anular movimiento
+        cursor.execute(
+            """
             UPDATE movimiento
             SET estado = 'ANULADO'
             WHERE id = %s
             AND usuario_id = %s
             AND estado != 'ANULADO'
-        """
+            """,
+            (movimiento_id, usuario_id)
+        )
 
-        cursor.execute(sql, (movimiento_id, usuario_id))
         conexion.commit()
 
         return cursor.rowcount
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()
