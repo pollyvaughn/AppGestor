@@ -2,9 +2,8 @@ from backend.database import get_connection
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
-from backend.services.saldo_service import actualizar_saldo
+from backend.services.saldo_service import actualizar_saldo, revertir_saldo
 from backend.services.compra_tarjeta_service import crear_compra_con_cursor
-
 
 def validar_referencias(cursor, recurrente, usuario_id):
     cursor.execute(
@@ -428,6 +427,118 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
             "periodo": periodo,
             "monto": monto_final,
             "proxima_fecha": nueva_fecha
+        }, None
+
+    except Exception:
+        conexion.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+def anular_movimiento_recurrente(recurrente_id, periodo, usuario_id):
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        conexion.start_transaction()
+
+        cursor.execute(
+            """
+            SELECT
+                mr.movimiento_id,
+                m.metodo_pago_id,
+                m.tipo,
+                m.monto
+            FROM movimiento_recurrente mr
+            INNER JOIN recurrente r
+                ON mr.recurrente_id = r.id
+            INNER JOIN movimiento m
+                ON mr.movimiento_id = m.id
+            WHERE mr.recurrente_id = %s
+            AND mr.periodo = %s
+            AND r.usuario_id = %s
+            AND m.estado != 'ANULADO'
+            """,
+            (recurrente_id, periodo, usuario_id)
+        )
+
+        movimiento = cursor.fetchone()
+
+        if not movimiento:
+            return None, "Movimiento recurrente no encontrado"
+
+        movimiento_id = movimiento["movimiento_id"]
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM compra_tarjeta
+            WHERE movimiento_id = %s
+            """,
+            (movimiento_id,)
+        )
+
+        compra = cursor.fetchone()
+
+        if compra:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cantidad
+                FROM cuota
+                WHERE compra_tarjeta_id = %s
+                AND estado = 'PAGADA'
+                """,
+                (compra["id"],)
+            )
+
+            if cursor.fetchone()["cantidad"] > 0:
+                return None, "No se puede anular: la compra tiene cuotas pagadas"
+
+            cursor.execute(
+                """
+                UPDATE cuota
+                SET estado = 'ANULADA',
+                    monto_pendiente = 0
+                WHERE compra_tarjeta_id = %s
+                """,
+                (compra["id"],)
+            )
+
+        else:
+            if movimiento["metodo_pago_id"] is not None:
+                revertir_saldo(
+                    cursor,
+                    movimiento["metodo_pago_id"],
+                    movimiento["monto"],
+                    movimiento["tipo"]
+                )
+
+        cursor.execute(
+            """
+            UPDATE movimiento
+            SET estado = 'ANULADO'
+            WHERE id = %s
+            AND estado != 'ANULADO'
+            """,
+            (movimiento_id,)
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO anulacion
+            (movimiento_id, motivo)
+            VALUES (%s, %s)
+            """,
+            (movimiento_id, "Movimiento recurrente anulado")
+        )
+
+        conexion.commit()
+
+        return {
+            "movimiento_id": movimiento_id,
+            "periodo": periodo
         }, None
 
     except Exception:

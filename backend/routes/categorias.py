@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth.dependencies import obtener_usuario_actual
 from backend.models.categoria import CategoriaCrear, CategoriaEditar
@@ -44,9 +44,10 @@ def editar(
     )
 
     if resultado == 0:
-        return {
-            "mensaje": "Categoría no encontrada"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Categoría no encontrada"
+        )
 
     return {
         "mensaje": "Categoría actualizada"
@@ -64,10 +65,10 @@ def eliminar(
     )
 
     if resultado == 0:
-        return {
-            "mensaje": "Categoría no encontrada"
-        }
-
+        raise HTTPException(
+            status_code=404,
+            detail="Categoría no encontrada"
+        )
     return {
         "mensaje": "Categoría eliminada"
     }

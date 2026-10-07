@@ -11,7 +11,8 @@ from backend.services.recurrente_service import (
     listar_recurrentes,
     editar_recurrente,
     eliminar_recurrente,
-    generar_movimiento
+    generar_movimiento,
+    anular_movimiento_recurrente
 )
 
 router = APIRouter(
@@ -114,5 +115,25 @@ def generar(
 
     return {
         "mensaje": "Movimiento generado",
+        **resultado
+    }
+
+@router.delete("/{recurrente_id}/periodo/{periodo}")
+def anular_periodo(
+    recurrente_id: int,
+    periodo: str,
+    usuario=Depends(obtener_usuario_actual)
+):
+    resultado, error = anular_movimiento_recurrente(
+        recurrente_id,
+        periodo,
+        usuario["id"]
+    )
+
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    return {
+        "mensaje": "Movimiento recurrente anulado",
         **resultado
     }
