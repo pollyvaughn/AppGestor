@@ -2,6 +2,9 @@ from backend.database import get_connection
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
+from backend.services.saldo_service import actualizar_saldo
+from backend.services.compra_tarjeta_service import crear_compra_con_cursor
+
 
 def validar_referencias(cursor, recurrente, usuario_id):
     cursor.execute(
@@ -21,7 +24,7 @@ def validar_referencias(cursor, recurrente, usuario_id):
     if recurrente.metodo_pago_id is not None:
         cursor.execute(
             """
-            SELECT id
+            SELECT id, tipo, moneda
             FROM metodo_pago
             WHERE id = %s
             AND usuario_id = %s
@@ -30,8 +33,13 @@ def validar_referencias(cursor, recurrente, usuario_id):
             (recurrente.metodo_pago_id, usuario_id)
         )
 
-        if not cursor.fetchone():
+        metodo = cursor.fetchone()
+
+        if not metodo:
             return "Método de pago no encontrado"
+
+        if metodo["moneda"] != recurrente.moneda:
+            return "La moneda del recurrente no coincide con la del método de pago"
 
     return None
 
@@ -80,6 +88,10 @@ def crear_recurrente(recurrente, usuario_id):
         conexion.commit()
 
         return cursor.lastrowid, None
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()
@@ -179,6 +191,10 @@ def editar_recurrente(recurrente_id, recurrente, usuario_id):
 
         return True, None
 
+    except Exception:
+        conexion.rollback()
+        raise
+
     finally:
         cursor.close()
         conexion.close()
@@ -203,6 +219,10 @@ def eliminar_recurrente(recurrente_id, usuario_id):
 
         return cursor.rowcount
 
+    except Exception:
+        conexion.rollback()
+        raise
+
     finally:
         cursor.close()
         conexion.close()
@@ -226,6 +246,8 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
     try:
         cursor = conexion.cursor(dictionary=True)
 
+        conexion.start_transaction()
+
         cursor.execute(
             """
             SELECT
@@ -239,7 +261,9 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
                 r.frecuencia,
                 r.proxima_fecha,
                 c.estado AS categoria_estado,
-                mp.estado AS metodo_estado
+                mp.estado AS metodo_estado,
+                mp.tipo AS metodo_tipo,
+                mp.moneda AS metodo_moneda
             FROM recurrente r
             INNER JOIN categoria c
                 ON r.categoria_id = c.id
@@ -265,6 +289,12 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
             and recurrente["metodo_estado"] != "ACTIVO"
         ):
             return None, "El método de pago del recurrente está inactivo"
+
+        if (
+            recurrente["metodo_pago_id"] is not None
+            and recurrente["metodo_moneda"] != recurrente["moneda"]
+        ):
+            return None, "La moneda del recurrente no coincide con la del método de pago"
 
         periodo = recurrente["proxima_fecha"]
 
@@ -292,35 +322,78 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
         else:
             monto_final = float(recurrente["monto_base"])
 
-        cursor.execute(
-            """
-            INSERT INTO movimiento
-            (
-                usuario_id,
-                categoria_id,
-                metodo_pago_id,
-                tipo,
-                estado,
-                descripcion,
-                monto,
-                moneda,
-                fecha
-            )
-            VALUES (%s, %s, %s, %s, 'CONFIRMADO', %s, %s, %s, %s)
-            """,
-            (
-                usuario_id,
-                recurrente["categoria_id"],
-                recurrente["metodo_pago_id"],
-                recurrente["tipo"],
-                recurrente["nombre"],
-                monto_final,
-                recurrente["moneda"],
-                periodo
-            )
-        )
+        movimiento_id = None
 
-        movimiento_id = cursor.lastrowid
+        # Recurrente con tarjeta de crédito
+        if recurrente["metodo_tipo"] == "TARJETA_CREDITO":
+
+            if recurrente["tipo"] != "EGRESO":
+                return None, "Una tarjeta de crédito solo puede usarse para recurrentes de tipo EGRESO"
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM tarjeta_credito
+                WHERE metodo_pago_id = %s
+                AND estado = 'ACTIVA'
+                """,
+                (recurrente["metodo_pago_id"],)
+            )
+
+            tarjeta = cursor.fetchone()
+
+            if not tarjeta:
+                return None, "Tarjeta de crédito no encontrada o no está activa"
+
+            compra_id, movimiento_id = crear_compra_con_cursor(
+                cursor=cursor,
+                usuario_id=usuario_id,
+                tarjeta_id=tarjeta["id"],
+                monto=monto_final,
+                cantidad_cuotas=1,
+                descripcion=recurrente["nombre"],
+                fecha_compra=periodo
+            )
+
+        # Recurrente con dinero propio
+        else:
+            cursor.execute(
+                """
+                INSERT INTO movimiento
+                (
+                    usuario_id,
+                    categoria_id,
+                    metodo_pago_id,
+                    tipo,
+                    estado,
+                    descripcion,
+                    monto,
+                    moneda,
+                    fecha
+                )
+                VALUES (%s, %s, %s, %s, 'CONFIRMADO', %s, %s, %s, %s)
+                """,
+                (
+                    usuario_id,
+                    recurrente["categoria_id"],
+                    recurrente["metodo_pago_id"],
+                    recurrente["tipo"],
+                    recurrente["nombre"],
+                    monto_final,
+                    recurrente["moneda"],
+                    periodo
+                )
+            )
+
+            movimiento_id = cursor.lastrowid
+
+            if recurrente["metodo_pago_id"] is not None:
+                actualizar_saldo(
+                    cursor,
+                    recurrente["metodo_pago_id"],
+                    monto_final,
+                    recurrente["tipo"]
+                )
 
         cursor.execute(
             """
@@ -341,12 +414,11 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
         cursor.execute(
             """
             UPDATE recurrente
-            SET proxima_fecha = %s,
-                monto_base = %s
+            SET proxima_fecha = %s
             WHERE id = %s
             AND usuario_id = %s
             """,
-            (nueva_fecha, monto_final, recurrente_id, usuario_id)
+            (nueva_fecha, recurrente_id, usuario_id)
         )
 
         conexion.commit()
