@@ -10,15 +10,32 @@ export default function RegisterPage({
     onLogin,
 }: RegisterPageProps) {
     return (
-        <main>
-            <RegisterForm onRegister={onRegister} />
+        <main className="min-h-full flex items-center justify-center p-6">
+            <div
+                className="w-full max-w-sm p-8 space-y-6"
+                style={{
+                    background: "var(--color-card)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-lg)",
+                }}
+            >
+                <RegisterForm onRegister={onRegister} />
 
-            <p>
-                ¿Ya tenés una cuenta?
-                <button onClick={onLogin}>
-                    Iniciá sesión
-                </button>
-            </p>
+                <p
+                    className="text-sm text-center"
+                    style={{ color: "var(--color-muted-foreground)" }}
+                >
+                    ¿Ya tenés una cuenta?{" "}
+                    <button
+                        type="button"
+                        onClick={onLogin}
+                        className="font-medium underline"
+                        style={{ color: "var(--color-foreground)" }}
+                    >
+                        Iniciá sesión
+                    </button>
+                </p>
+            </div>
         </main>
     )
 }

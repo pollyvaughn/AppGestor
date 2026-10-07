@@ -68,7 +68,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
                 </p>
             )}
 
-            <Button type="submit">Iniciar sesión</Button>
+            <Button type="submit" className="w-full">Iniciar sesión</Button>
         </form>
     )
 }

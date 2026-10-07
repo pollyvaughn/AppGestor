@@ -1,5 +1,7 @@
 import { useState } from "react"
 import { registrarUsuario } from "../../services/authService"
+import Button from "../ui/Button"
+import Input from "../ui/Input"
 
 type RegisterFormProps = {
     onRegister: () => void
@@ -33,53 +35,50 @@ export default function RegisterForm({ onRegister }: RegisterFormProps) {
     }
 
     return (
-        <form onSubmit={handleSubmit}>
-            <h1>Crear cuenta</h1>
+        <form onSubmit={handleSubmit} className="space-y-4 w-full">
+            <h1 className="text-lg font-medium">Crear cuenta</h1>
 
-            <div>
-                <label htmlFor="nombre">Nombre</label>
-                <input
-                    id="nombre"
-                    type="text"
-                    value={nombre}
-                    onChange={function (event) {
-                        setNombre(event.target.value)
-                    }}
-                    required
-                />
-            </div>
+            <Input
+                id="nombre"
+                label="Nombre"
+                value={nombre}
+                onChange={function (event) {
+                    setNombre(event.target.value)
+                }}
+                required
+            />
 
-            <div>
-                <label htmlFor="email">Email</label>
-                <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={function (event) {
-                        setEmail(event.target.value)
-                    }}
-                    required
-                />
-            </div>
+            <Input
+                id="email"
+                label="Email"
+                type="email"
+                value={email}
+                onChange={function (event) {
+                    setEmail(event.target.value)
+                }}
+                required
+            />
 
-            <div>
-                <label htmlFor="password">Contraseña</label>
-                <input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={function (event) {
-                        setPassword(event.target.value)
-                    }}
-                    required
-                />
-            </div>
+            <Input
+                id="password"
+                label="Contraseña"
+                type="password"
+                value={password}
+                onChange={function (event) {
+                    setPassword(event.target.value)
+                }}
+                required
+            />
 
-            {error && <p>{error}</p>}
+            {error && (
+                <p className="text-sm" style={{ color: "var(--color-expense)" }}>
+                    {error}
+                </p>
+            )}
 
-            <button type="submit">
+            <Button type="submit" className="w-full">
                 Registrarse
-            </button>
+            </Button>
         </form>
     )
 }
