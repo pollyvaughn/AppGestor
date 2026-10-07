@@ -28,7 +28,7 @@ export default function Modal({
             }}
         >
             <div
-                className="w-full"
+                className="w-full max-h-[90vh] overflow-y-auto"
                 style={{
                     maxWidth: wide ? "600px" : "440px",
                     background: "var(--color-card)",
