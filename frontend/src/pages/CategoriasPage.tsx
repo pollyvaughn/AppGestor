@@ -10,6 +10,9 @@ import Input from "../components/ui/Input"
 import Modal from "../components/ui/Modal"
 import Select from "../components/ui/Select"
 import ColorPicker from "../components/ui/ColorPicker"
+import Cargando from "../components/ui/Cargando"
+import EstadoVacio from "../components/ui/EstadoVacio"
+import Mensaje from "../components/ui/Mensaje"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -36,6 +39,7 @@ const formularioInicial: Formulario = {
 
 export default function CategoriasPage() {
     const [categorias, setCategorias] = useState<Categoria[]>([])
+    const [cargando, setCargando] = useState(true)
     const [modalAbierto, setModalAbierto] = useState(false)
     const [editando, setEditando] = useState<number | null>(null)
     const [formulario, setFormulario] = useState<Formulario>(formularioInicial)
@@ -52,6 +56,8 @@ export default function CategoriasPage() {
                     ? e.message
                     : "No se pudieron cargar las categorías"
             )
+        } finally {
+            setCargando(false)
         }
     }
 
@@ -153,39 +159,32 @@ export default function CategoriasPage() {
                     {titulo}
                 </h2>
 
-                {lista.length === 0 && (
-                    <p
-                        className="text-sm"
-                        style={{ color: "var(--color-muted-foreground)" }}
-                    >
-                        Sin categorías.
-                    </p>
-                )}
+                {lista.length === 0 && <EstadoVacio texto="Sin categorías." />}
 
                 {lista.map(function (categoria) {
                     return (
                         <div
                             key={categoria.id}
-                            className="flex items-center justify-between py-2.5"
+                            className="flex items-center justify-between gap-3 py-2.5"
                             style={{
                                 borderBottom: "1px solid var(--color-border)",
                             }}
                         >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
                                 <span
-                                    className="w-3 h-3 rounded-full"
+                                    className="w-3 h-3 rounded-full shrink-0"
                                     style={{
                                         background:
                                             categoria.color ??
                                             COLOR_POR_DEFECTO,
                                     }}
                                 />
-                                <span className="text-sm">
+                                <span className="text-sm truncate">
                                     {categoria.nombre}
                                 </span>
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 shrink-0">
                                 <Button
                                     type="button"
                                     variant="secondary"
@@ -217,7 +216,7 @@ export default function CategoriasPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-lg font-medium">Categorías</h1>
 
                 <Button type="button" onClick={abrirNueva}>
@@ -225,26 +224,24 @@ export default function CategoriasPage() {
                 </Button>
             </div>
 
-            {error && !modalAbierto && (
-                <p className="text-sm" style={{ color: "var(--color-expense)" }}>
-                    {error}
-                </p>
-            )}
+            {error && !modalAbierto && <Mensaje tipo="error">{error}</Mensaje>}
 
-            {mensaje && (
-                <p className="text-sm" style={{ color: "var(--color-income)" }}>
-                    {mensaje}
-                </p>
-            )}
+            {mensaje && <Mensaje tipo="exito">{mensaje}</Mensaje>}
 
-            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                {renderLista("Egresos", "EGRESO")}
-                {renderLista("Ingresos", "INGRESO")}
-            </div>
+            {cargando ? (
+                <Cargando />
+            ) : (
+                <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                    {renderLista("Egresos", "EGRESO")}
+                    {renderLista("Ingresos", "INGRESO")}
+                </div>
+            )}
 
             <Modal
                 open={modalAbierto}
-                title={editando === null ? "Nueva categoría" : "Editar categoría"}
+                title={
+                    editando === null ? "Nueva categoría" : "Editar categoría"
+                }
                 onClose={function () {
                     setModalAbierto(false)
                 }}
@@ -255,7 +252,10 @@ export default function CategoriasPage() {
                         label="Nombre"
                         value={formulario.nombre}
                         onChange={function (e) {
-                            setFormulario({ ...formulario, nombre: e.target.value })
+                            setFormulario({
+                                ...formulario,
+                                nombre: e.target.value,
+                            })
                         }}
                         required
                         autoFocus
@@ -284,14 +284,7 @@ export default function CategoriasPage() {
                         }}
                     />
 
-                    {error && (
-                        <p
-                            className="text-sm"
-                            style={{ color: "var(--color-expense)" }}
-                        >
-                            {error}
-                        </p>
-                    )}
+                    {error && <Mensaje tipo="error">{error}</Mensaje>}
 
                     <div className="flex gap-2 pt-1">
                         <Button

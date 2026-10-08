@@ -9,8 +9,11 @@ import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 import Modal from "../components/ui/Modal"
 import MontoInput from "../components/ui/MontoInput"
-import { formatearMonto } from "../lib/moneda"
 import Select from "../components/ui/Select"
+import Cargando from "../components/ui/Cargando"
+import EstadoVacio from "../components/ui/EstadoVacio"
+import Mensaje from "../components/ui/Mensaje"
+import { formatearMonto } from "../lib/moneda"
 
 type TipoCuenta =
     | "EFECTIVO"
@@ -57,6 +60,7 @@ const formularioInicial: Formulario = {
 
 export default function CuentasPage() {
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
+    const [cargando, setCargando] = useState(true)
     const [modalAbierto, setModalAbierto] = useState(false)
     const [editando, setEditando] = useState<number | null>(null)
     const [formulario, setFormulario] = useState<Formulario>(formularioInicial)
@@ -73,6 +77,8 @@ export default function CuentasPage() {
                     ? e.message
                     : "No se pudieron cargar las cuentas."
             )
+        } finally {
+            setCargando(false)
         }
     }
 
@@ -158,7 +164,7 @@ export default function CuentasPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-lg font-medium">Cuentas</h1>
 
                 <Button type="button" onClick={abrirNuevo}>
@@ -166,25 +172,14 @@ export default function CuentasPage() {
                 </Button>
             </div>
 
-            {error && !modalAbierto && (
-                <p className="text-sm" style={{ color: "var(--color-expense)" }}>
-                    {error}
-                </p>
-            )}
+            {error && !modalAbierto && <Mensaje tipo="error">{error}</Mensaje>}
 
-            {mensaje && (
-                <p className="text-sm" style={{ color: "var(--color-income)" }}>
-                    {mensaje}
-                </p>
-            )}
+            {mensaje && <Mensaje tipo="exito">{mensaje}</Mensaje>}
 
-            {cuentas.length === 0 && (
-                <p
-                    className="text-sm"
-                    style={{ color: "var(--color-muted-foreground)" }}
-                >
-                    No tenés cuentas.
-                </p>
+            {cargando && <Cargando />}
+
+            {!cargando && cuentas.length === 0 && (
+                <EstadoVacio texto="No tenés cuentas." />
             )}
 
             <div
@@ -281,11 +276,7 @@ export default function CuentasPage() {
 
             <Modal
                 open={modalAbierto}
-                title={
-                    editando === null
-                        ? "Nueva cuenta"
-                        : "Editar cuenta"
-                }
+                title={editando === null ? "Nueva cuenta" : "Editar cuenta"}
                 onClose={function () {
                     setModalAbierto(false)
                 }}
@@ -339,7 +330,13 @@ export default function CuentasPage() {
                                     moneda: moneda,
                                     saldo:
                                         moneda === "PYG"
-                                            ? String(Math.trunc(Number(formulario.saldo || 0)))
+                                            ? String(
+                                                  Math.trunc(
+                                                      Number(
+                                                          formulario.saldo || 0
+                                                      )
+                                                  )
+                                              )
                                             : formulario.saldo,
                                 })
                             }}
@@ -364,14 +361,7 @@ export default function CuentasPage() {
                         />
                     </div>
 
-                    {error && (
-                        <p
-                            className="text-sm"
-                            style={{ color: "var(--color-expense)" }}
-                        >
-                            {error}
-                        </p>
-                    )}
+                    {error && <Mensaje tipo="error">{error}</Mensaje>}
 
                     <div className="flex gap-2 pt-1">
                         <Button
