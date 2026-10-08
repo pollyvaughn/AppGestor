@@ -113,6 +113,11 @@ def crear_ajuste(ajuste, usuario_id):
 
         total_cuota = cuota_base["monto_base"] + total_ajustes
 
+        if total_cuota <= 0:
+            raise ValueError(
+                "El ajuste no puede dejar el total de la cuota en cero o negativo"
+            )
+        
         cursor.execute(
             """
             SELECT
