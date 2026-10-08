@@ -82,12 +82,16 @@ def crear_movimiento(movimiento, usuario_id):
 
         # Actualizar saldo del método de pago
         if movimiento.metodo_pago_id is not None:
-            actualizar_saldo(
-                cursor,
-                movimiento.metodo_pago_id,
-                movimiento.monto,
-                movimiento.tipo
-            )
+            try:
+                actualizar_saldo(
+                    cursor,
+                    movimiento.metodo_pago_id,
+                    movimiento.monto,
+                    movimiento.tipo
+                )
+            except ValueError as e:
+                conexion.rollback()
+                return None, str(e)
 
         conexion.commit()
 
@@ -243,12 +247,16 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
 
         # Aplicar efecto del nuevo movimiento
         if movimiento.metodo_pago_id is not None:
-            actualizar_saldo(
-                cursor,
-                movimiento.metodo_pago_id,
-                movimiento.monto,
-                movimiento.tipo
-            )
+            try:
+                actualizar_saldo(
+                    cursor,
+                    movimiento.metodo_pago_id,
+                    movimiento.monto,
+                    movimiento.tipo
+                )
+            except ValueError as e:
+                conexion.rollback()
+                return None, str(e)
 
         conexion.commit()
 

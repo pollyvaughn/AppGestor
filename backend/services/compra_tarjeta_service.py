@@ -19,7 +19,8 @@ def crear_compra_con_cursor(
         SELECT
             tc.id,
             tc.fecha_cierre,
-            tc.fecha_vencimiento
+            tc.fecha_vencimiento,
+            tc.limite_credito
         FROM tarjeta_credito tc
         INNER JOIN metodo_pago mp
             ON tc.metodo_pago_id = mp.id
@@ -34,6 +35,28 @@ def crear_compra_con_cursor(
 
     if not tarjeta:
         raise ValueError("Tarjeta no encontrada o no está activa")
+
+    cursor.execute(
+        """
+        SELECT COALESCE(SUM(c.monto_pendiente), 0) AS deuda
+        FROM cuota c
+        INNER JOIN compra_tarjeta ct
+            ON c.compra_tarjeta_id = ct.id
+        WHERE ct.tarjeta_id = %s
+        AND c.estado IN ('PENDIENTE', 'PARCIAL')
+        """,
+        (tarjeta_id,)
+    )
+
+    deuda = cursor.fetchone()["deuda"]
+
+    disponible = tarjeta["limite_credito"] - deuda
+
+    if monto > disponible:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La compra supera el límite disponible. Disponible: {disponible}"
+        )
 
     cursor.execute(
         """
@@ -203,6 +226,7 @@ def crear_compra(compra, usuario_id, fecha_compra=None):
         cursor.close()
         conexion.close()
 
+
 def listar_compras(usuario_id):
     conexion = get_connection()
 
@@ -276,6 +300,7 @@ def listar_cuotas(compra_id, usuario_id):
     finally:
         cursor.close()
         conexion.close()
+
 
 def editar_compra(compra_id, compra, usuario_id):
     conexion = get_connection()
