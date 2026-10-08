@@ -1,5 +1,5 @@
 from backend.database import get_connection
-
+from fastapi import HTTPException
 
 def crear_tarjeta(tarjeta, usuario_id):
     conexion = get_connection()
@@ -142,6 +142,8 @@ def eliminar_tarjeta(tarjeta_id, usuario_id):
     try:
         cursor = conexion.cursor(dictionary=True)
 
+        conexion.start_transaction()
+
         cursor.execute(
             """
             SELECT tc.id
@@ -160,9 +162,26 @@ def eliminar_tarjeta(tarjeta_id, usuario_id):
         if not tarjeta:
             return 0
 
-        # Por ahora solamente verificamos que exista.
-        # La regla de impedir la baja cuando quedan cuotas
-        # la implementamos cuando hagamos cuotas.
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM cuota c
+            INNER JOIN compra_tarjeta ct
+                ON c.compra_tarjeta_id = ct.id
+            WHERE ct.tarjeta_id = %s
+            AND c.estado IN ('PENDIENTE', 'PARCIAL')
+            """,
+            (tarjeta_id,)
+        )
+
+        cuotas_pendientes = cursor.fetchone()
+
+        if cuotas_pendientes["total"] > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede dar de baja la tarjeta porque tiene cuotas pendientes"
+            )
+
         cursor.execute(
             """
             UPDATE tarjeta_credito tc
@@ -180,6 +199,10 @@ def eliminar_tarjeta(tarjeta_id, usuario_id):
         conexion.commit()
 
         return cursor.rowcount
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()
