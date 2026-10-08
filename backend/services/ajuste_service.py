@@ -222,29 +222,19 @@ def anular_ajuste(ajuste_id, usuario_id):
             SELECT
                 a.id,
                 a.cuota_id,
-                a.movimiento_id,
                 a.estado
             FROM ajuste a
-            LEFT JOIN cuota c
+            INNER JOIN cuota c
                 ON a.cuota_id = c.id
-            LEFT JOIN compra_tarjeta ct
+            INNER JOIN compra_tarjeta ct
                 ON c.compra_tarjeta_id = ct.id
-            LEFT JOIN movimiento m
+            INNER JOIN movimiento m
                 ON ct.movimiento_id = m.id
             WHERE a.id = %s
-            AND (
-                m.usuario_id = %s
-                OR EXISTS (
-                    SELECT 1
-                    FROM movimiento mov
-                    WHERE mov.id = a.movimiento_id
-                    AND mov.usuario_id = %s
-                )
-            )
+            AND m.usuario_id = %s
             """,
             (
                 ajuste_id,
-                usuario_id,
                 usuario_id
             )
         )
@@ -283,84 +273,82 @@ def anular_ajuste(ajuste_id, usuario_id):
             )
         )
 
-        if ajuste["cuota_id"] is not None:
+        cursor.execute(
+            """
+            SELECT
+                c.monto_base,
+                COALESCE(
+                    (
+                        SELECT SUM(
+                            CASE
+                                WHEN a.tipo IN (
+                                    'RECARGO',
+                                    'INTERES',
+                                    'COMISION',
+                                    'ADICIONAL'
+                                )
+                                THEN a.monto
+                                WHEN a.tipo = 'DESCUENTO'
+                                THEN -a.monto
+                                ELSE 0
+                            END
+                        )
+                        FROM ajuste a
+                        WHERE a.cuota_id = c.id
+                        AND a.estado = 'ACTIVO'
+                    ),
+                    0
+                ) AS total_ajustes,
+                COALESCE(
+                    (
+                        SELECT SUM(p.monto)
+                        FROM pago p
+                        WHERE p.cuota_id = c.id
+                        AND p.estado = 'CONFIRMADO'
+                    ),
+                    0
+                ) AS total_pagado
+            FROM cuota c
+            WHERE c.id = %s
+            """,
+            (ajuste["cuota_id"],)
+        )
 
-            cursor.execute(
-                """
-                SELECT
-                    c.monto_base,
-                    COALESCE(
-                        (
-                            SELECT SUM(
-                                CASE
-                                    WHEN a.tipo IN (
-                                        'RECARGO',
-                                        'INTERES',
-                                        'COMISION',
-                                        'ADICIONAL'
-                                    )
-                                    THEN a.monto
-                                    WHEN a.tipo = 'DESCUENTO'
-                                    THEN -a.monto
-                                    ELSE 0
-                                END
-                            )
-                            FROM ajuste a
-                            WHERE a.cuota_id = c.id
-                            AND a.estado = 'ACTIVO'
-                        ),
-                        0
-                    ) AS total_ajustes,
-                    COALESCE(
-                        (
-                            SELECT SUM(p.monto)
-                            FROM pago p
-                            WHERE p.cuota_id = c.id
-                            AND p.estado = 'CONFIRMADO'
-                        ),
-                        0
-                    ) AS total_pagado
-                FROM cuota c
-                WHERE c.id = %s
-                """,
-                (ajuste["cuota_id"],)
+        cuota = cursor.fetchone()
+
+        total_cuota = (
+            cuota["monto_base"]
+            + cuota["total_ajustes"]
+        )
+
+        monto_pendiente = (
+            total_cuota
+            - cuota["total_pagado"]
+        )
+
+        if monto_pendiente < 0:
+            monto_pendiente = 0
+
+        estado = "PAGADA" if monto_pendiente == 0 else (
+            "PARCIAL"
+            if cuota["total_pagado"] > 0
+            else "PENDIENTE"
+        )
+
+        cursor.execute(
+            """
+            UPDATE cuota
+            SET
+                monto_pendiente = %s,
+                estado = %s
+            WHERE id = %s
+            """,
+            (
+                monto_pendiente,
+                estado,
+                ajuste["cuota_id"]
             )
-
-            cuota = cursor.fetchone()
-
-            total_cuota = (
-                cuota["monto_base"]
-                + cuota["total_ajustes"]
-            )
-
-            monto_pendiente = (
-                total_cuota
-                - cuota["total_pagado"]
-            )
-
-            if monto_pendiente < 0:
-                monto_pendiente = 0
-
-            estado = "PAGADA" if monto_pendiente == 0 else (
-                "PARCIAL"
-                if cuota["total_pagado"] > 0
-                else "PENDIENTE"
-            )
-
-            cursor.execute(
-                """
-                UPDATE cuota
-                SET
-                    monto_pendiente = %s,
-                    estado = %s
-                WHERE id = %s
-                """,
-                (
-                    monto_pendiente,
-                    estado,
-                    ajuste["cuota_id"]
-                )
-            )
+        )
 
         conexion.commit()
 
