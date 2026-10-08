@@ -12,7 +12,7 @@ def crear_movimiento(movimiento, usuario_id):
         if movimiento.categoria_id is not None:
             cursor.execute(
                 """
-                SELECT id
+                SELECT id, tipo
                 FROM categoria
                 WHERE id = %s
                 AND usuario_id = %s
@@ -21,8 +21,14 @@ def crear_movimiento(movimiento, usuario_id):
                 (movimiento.categoria_id, usuario_id)
             )
 
-            if not cursor.fetchone():
+            categoria = cursor.fetchone()
+
+            if not categoria:
                 return None, "Categoría no encontrada"
+
+            if movimiento.tipo in ("INGRESO", "EGRESO"):
+                if categoria["tipo"] != movimiento.tipo:
+                    return None, "La categoría no corresponde al tipo de movimiento"
 
         # Verificar método de pago
         if movimiento.metodo_pago_id is not None:
@@ -72,6 +78,8 @@ def crear_movimiento(movimiento, usuario_id):
 
         cursor.execute(sql, valores)
 
+        movimiento_id = cursor.lastrowid
+
         # Actualizar saldo del método de pago
         if movimiento.metodo_pago_id is not None:
             actualizar_saldo(
@@ -83,7 +91,7 @@ def crear_movimiento(movimiento, usuario_id):
 
         conexion.commit()
 
-        return cursor.lastrowid, None
+        return movimiento_id, None
 
     except Exception:
         conexion.rollback()
@@ -159,7 +167,7 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
         if movimiento.categoria_id is not None:
             cursor.execute(
                 """
-                SELECT id
+                SELECT id, tipo
                 FROM categoria
                 WHERE id = %s
                 AND usuario_id = %s
@@ -168,8 +176,14 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
                 (movimiento.categoria_id, usuario_id)
             )
 
-            if not cursor.fetchone():
+            categoria = cursor.fetchone()
+
+            if not categoria:
                 return False, "Categoría no encontrada"
+
+            if movimiento.tipo in ("INGRESO", "EGRESO"):
+                if categoria["tipo"] != movimiento.tipo:
+                    return False, "La categoría no corresponde al tipo de movimiento"
 
         # Verificar método de pago
         if movimiento.metodo_pago_id is not None:
