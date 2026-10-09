@@ -35,7 +35,6 @@ def actualizar_saldo(cursor, metodo_pago_id, monto, tipo):
 
     cursor.execute(sql, (monto, metodo_pago_id))
 
-
 def revertir_saldo(cursor, metodo_pago_id, monto, tipo):
     if tipo == "INGRESO":
         sql = """

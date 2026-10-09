@@ -117,7 +117,7 @@ def crear_ajuste(ajuste, usuario_id):
             raise ValueError(
                 "El ajuste no puede dejar el total de la cuota en cero o negativo"
             )
-        
+
         cursor.execute(
             """
             SELECT

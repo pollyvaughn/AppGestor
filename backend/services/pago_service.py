@@ -28,6 +28,7 @@ def obtener_total_cuota(cursor, cuota_id):
         FROM cuota c
         LEFT JOIN ajuste a
             ON a.cuota_id = c.id
+            AND a.estado = 'ACTIVO'
         WHERE c.id = %s
         GROUP BY c.id, c.monto_base
         """,
@@ -377,6 +378,17 @@ def editar_pago(pago_id, pago, usuario_id):
                 detail="El monto debe ser mayor a 0"
             )
 
+        ids_metodos = [
+            metodo.metodo_pago_id
+            for metodo in pago.metodos
+        ]
+
+        if len(ids_metodos) != len(set(ids_metodos)):
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede repetir un método de pago"
+            )
+
         monto_metodos = sum(
             metodo.monto
             for metodo in pago.metodos
@@ -437,20 +449,49 @@ def editar_pago(pago_id, pago, usuario_id):
                     detail="Los métodos de pago deben utilizar la misma moneda que el pago"
                 )
 
-        pendiente_sin_pago = (
-            float(pago_actual["monto_pendiente"])
-            + float(pago_actual["monto"])
+        total_cuota = obtener_total_cuota(
+            cursor,
+            pago_actual["cuota_id"])
+
+        if total_cuota is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Cuota no encontrada")
+
+        cursor.execute(
+            """ 
+            SELECT COALESCE(SUM(monto), 0) AS total_pagado 
+            FROM pago WHERE cuota_id = %s 
+            AND estado = 'CONFIRMADO' 
+            AND id != %s 
+            """,
+            (
+                pago_actual["cuota_id"],
+                pago_id
+            )
         )
 
-        nuevo_pendiente = (
-            pendiente_sin_pago - pago.monto
-        )
+        resultado = cursor.fetchone()
 
-        if nuevo_pendiente < 0:
+        total_otros_pagos = float(resultado["total_pagado"])
+
+        nuevo_total_pagado = total_otros_pagos + pago.monto
+
+        if nuevo_total_pagado > total_cuota:
             raise HTTPException(
                 status_code=400,
-                detail="El nuevo monto supera el pendiente disponible de la cuota"
+                detail="El monto editado supera el total pendiente disponible de la cuota"
             )
+
+        nuevo_pendiente = round(
+            total_cuota - nuevo_total_pagado,
+            2
+        )
+
+        if nuevo_pendiente == 0:
+            nuevo_estado = "PAGADA"
+        else:
+            nuevo_estado = "PARCIAL"
 
         cursor.execute(
             """
@@ -545,11 +586,6 @@ def editar_pago(pago_id, pago, usuario_id):
                 pago_id
             )
         )
-
-        if nuevo_pendiente == 0:
-            nuevo_estado = "PAGADA"
-        else:
-            nuevo_estado = "PARCIAL"
 
         cursor.execute(
             """
