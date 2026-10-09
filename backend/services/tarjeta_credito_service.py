@@ -59,7 +59,6 @@ def crear_tarjeta(tarjeta, usuario_id):
         cursor.close()
         conexion.close()
 
-
 def listar_tarjetas(usuario_id):
     conexion = get_connection()
 
@@ -76,7 +75,33 @@ def listar_tarjetas(usuario_id):
                 tc.limite_credito,
                 tc.fecha_cierre,
                 tc.fecha_vencimiento,
-                tc.porcentaje_pago_minimo
+                tc.porcentaje_pago_minimo,
+
+                COALESCE((
+                    SELECT SUM(
+                        CASE
+                            WHEN p.estado = 'CONFIRMADO'
+                            THEN p.monto
+                            ELSE 0
+                        END
+                    )
+                    FROM cuota c
+                    INNER JOIN compra_tarjeta ct
+                        ON c.compra_tarjeta_id = ct.id
+                    INNER JOIN pago p
+                        ON p.cuota_id = c.id
+                    WHERE ct.tarjeta_id = tc.id
+                ), 0) AS total_pagado,
+
+                COALESCE((
+                    SELECT SUM(c.monto_pendiente)
+                    FROM cuota c
+                    INNER JOIN compra_tarjeta ct
+                        ON c.compra_tarjeta_id = ct.id
+                    WHERE ct.tarjeta_id = tc.id
+                    AND c.estado IN ('PENDIENTE', 'PARCIAL')
+                ), 0) AS deuda_actual
+
             FROM tarjeta_credito tc
             INNER JOIN metodo_pago mp
                 ON tc.metodo_pago_id = mp.id
@@ -85,13 +110,32 @@ def listar_tarjetas(usuario_id):
         """
 
         cursor.execute(sql, (usuario_id,))
+        tarjetas = cursor.fetchall()
 
-        return cursor.fetchall()
+        for tarjeta in tarjetas:
+            tarjeta["limite_credito"] = float(
+                tarjeta["limite_credito"]
+            )
+
+            tarjeta["deuda_actual"] = float(
+                tarjeta["deuda_actual"]
+            )
+
+            tarjeta["disponible"] = round(
+                tarjeta["limite_credito"]
+                - tarjeta["deuda_actual"],
+                2
+            )
+
+            tarjeta["total_pagado"] = float(
+                tarjeta["total_pagado"]
+            )
+
+        return tarjetas
 
     finally:
         cursor.close()
         conexion.close()
-
 
 def editar_tarjeta(tarjeta_id, tarjeta, usuario_id):
     conexion = get_connection()

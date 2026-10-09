@@ -490,6 +490,8 @@ def editar_pago(pago_id, pago, usuario_id):
 
         if nuevo_pendiente == 0:
             nuevo_estado = "PAGADA"
+        elif nuevo_total_pagado == 0:
+            nuevo_estado = "PENDIENTE"
         else:
             nuevo_estado = "PARCIAL"
 
@@ -766,10 +768,7 @@ def anular_pago(pago_id, usuario_id):
                 NOW()
             )
             """,
-            (
-                pago_id,
-                "Pago anulado"
-            )
+            (pago_id, "Pago anulado")
         )
 
         conexion.commit()
