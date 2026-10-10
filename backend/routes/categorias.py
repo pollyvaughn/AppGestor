@@ -49,6 +49,12 @@ def editar(
             detail="Categoría no encontrada"
         )
 
+    if resultado == -1:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede cambiar el tipo de una categoría que tiene movimientos o recurrentes asociados"
+        )
+
     return {
         "mensaje": "Categoría actualizada"
     }
@@ -69,6 +75,7 @@ def eliminar(
             status_code=404,
             detail="Categoría no encontrada"
         )
+
     return {
         "mensaje": "Categoría eliminada"
     }
