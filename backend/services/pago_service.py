@@ -633,6 +633,7 @@ def editar_pago(pago_id, pago, usuario_id):
         cursor.close()
         conexion.close()
 
+
 def anular_pago(pago_id, usuario_id):
     conexion = get_connection()
 
@@ -647,7 +648,6 @@ def anular_pago(pago_id, usuario_id):
                 p.estado,
                 p.movimiento_id,
                 p.cuota_id,
-                c.monto_pendiente,
                 c.estado AS cuota_estado
             FROM pago p
             INNER JOIN movimiento m
@@ -658,10 +658,7 @@ def anular_pago(pago_id, usuario_id):
               AND m.usuario_id = %s
             FOR UPDATE
             """,
-            (
-                pago_id,
-                usuario_id
-            )
+            (pago_id, usuario_id)
         )
 
         pago_actual = cursor.fetchone()
@@ -678,47 +675,73 @@ def anular_pago(pago_id, usuario_id):
                 detail="El pago ya está anulado"
             )
 
+        if pago_actual["estado"] != "CONFIRMADO":
+            raise HTTPException(
+                status_code=400,
+                detail="Solo se pueden anular pagos confirmados"
+            )
+
         if pago_actual["cuota_estado"] in ("OMITIDA", "ANULADA"):
             raise HTTPException(
                 status_code=400,
                 detail="No se puede anular un pago de una cuota omitida o anulada"
             )
 
+        # Calcular el total actual de la cuota, incluidos sus ajustes.
         total_cuota = obtener_total_cuota(
             cursor,
             pago_actual["cuota_id"]
         )
 
-        nuevo_pendiente = (
-            float(pago_actual["monto_pendiente"])
-            + float(pago_actual["monto"])
+        if total_cuota is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Cuota no encontrada"
+            )
+
+        # Recalcular lo pagado sin contar el pago que se anulará.
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(monto), 0) AS total_pagado
+            FROM pago
+            WHERE cuota_id = %s
+              AND id != %s
+              AND estado = 'CONFIRMADO'
+            """,
+            (
+                pago_actual["cuota_id"],
+                pago_id
+            )
         )
 
-        if nuevo_pendiente > total_cuota:
-            nuevo_pendiente = total_cuota
+        resultado = cursor.fetchone()
+        total_pagado = float(resultado["total_pagado"])
+
+        nuevo_pendiente = round(
+            max(0, float(total_cuota) - total_pagado),
+            2
+        )
 
         if nuevo_pendiente == 0:
             nuevo_estado_cuota = "PAGADA"
-
-        elif nuevo_pendiente == total_cuota:
+        elif nuevo_pendiente >= round(float(total_cuota), 2):
             nuevo_estado_cuota = "PENDIENTE"
-
         else:
             nuevo_estado_cuota = "PARCIAL"
 
+        # Recuperar los métodos usados en el pago original.
         cursor.execute(
             """
             SELECT metodo_pago_id, monto
             FROM movimiento_metodo
             WHERE movimiento_id = %s
             """,
-            (
-                pago_actual["movimiento_id"],
-            )
+            (pago_actual["movimiento_id"],)
         )
 
         metodos_pago = cursor.fetchall()
 
+        # Revertir el efecto del pago en los saldos de esos métodos.
         for metodo in metodos_pago:
             revertir_saldo(
                 cursor,
@@ -727,15 +750,14 @@ def anular_pago(pago_id, usuario_id):
                 "EGRESO"
             )
 
+        # Marcar el pago y su movimiento como anulados.
         cursor.execute(
             """
             UPDATE pago
             SET estado = 'ANULADO'
             WHERE id = %s
             """,
-            (
-                pago_id,
-            )
+            (pago_id,)
         )
 
         cursor.execute(
@@ -744,11 +766,10 @@ def anular_pago(pago_id, usuario_id):
             SET estado = 'ANULADO'
             WHERE id = %s
             """,
-            (
-                pago_actual["movimiento_id"],
-            )
+            (pago_actual["movimiento_id"],)
         )
 
+        # Actualizar el pendiente y estado de la cuota.
         cursor.execute(
             """
             UPDATE cuota
@@ -764,6 +785,7 @@ def anular_pago(pago_id, usuario_id):
             )
         )
 
+        # Registrar la anulación asociada al pago.
         cursor.execute(
             """
             INSERT INTO anulacion
@@ -773,15 +795,14 @@ def anular_pago(pago_id, usuario_id):
                 motivo,
                 fecha
             )
-            VALUES (
-                NULL,
-                %s,
-                %s,
-                NOW()
-            )
+            VALUES (NULL, %s, %s, NOW())
             """,
-            (pago_id, "Pago anulado")
+            (
+                pago_id,
+                "Pago anulado"
+            )
         )
+
 
         conexion.commit()
 
