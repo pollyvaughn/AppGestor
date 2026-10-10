@@ -88,6 +88,11 @@ def omitir_cuota(cuota_id, usuario_id):
         if not siguiente_cuota:
             raise ValueError("No existe una cuota siguiente para arrastrar el saldo")
 
+        if siguiente_cuota["estado"] not in ("PENDIENTE", "PARCIAL"):
+            raise ValueError(
+                "La cuota siguiente no está disponible para recibir el saldo"
+            )
+
         cursor.execute(
             """
             UPDATE cuota
