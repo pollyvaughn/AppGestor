@@ -14,6 +14,7 @@ def crear_ajuste(ajuste, usuario_id):
             SELECT
                 c.id,
                 c.monto_base,
+                c.estado,
                 mp.moneda
             FROM cuota c
             INNER JOIN compra_tarjeta ct
@@ -35,6 +36,11 @@ def crear_ajuste(ajuste, usuario_id):
 
         if not cuota:
             raise ValueError("Cuota no encontrada")
+
+        if cuota["estado"] in ("OMITIDA", "ANULADA"):
+            raise ValueError(
+                "No se pueden agregar ajustes a una cuota omitida o anulada"
+            )
 
         if ajuste.tipo not in (
             "RECARGO",
@@ -233,7 +239,8 @@ def anular_ajuste(ajuste_id, usuario_id):
             SELECT
                 a.id,
                 a.cuota_id,
-                a.estado
+                a.estado,
+                c.estado AS estado_cuota
             FROM ajuste a
             INNER JOIN cuota c
                 ON a.cuota_id = c.id
@@ -255,6 +262,11 @@ def anular_ajuste(ajuste_id, usuario_id):
 
         if ajuste["estado"] == "ANULADO":
             raise ValueError("El ajuste ya está anulado")
+
+        if ajuste["estado_cuota"] in ("OMITIDA", "ANULADA"):
+            raise ValueError(
+                "No se pueden anular ajustes de una cuota omitida o anulada"
+            )
 
         cursor.execute(
             """

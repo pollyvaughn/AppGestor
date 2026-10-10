@@ -81,10 +81,10 @@ def crear_pago(pago, usuario_id):
                 detail="Cuota no encontrada"
             )
 
-        if cuota["estado"] == "PAGADA":
+        if cuota["estado"] in ("PAGADA", "OMITIDA", "ANULADA"):
             raise HTTPException(
                 status_code=400,
-                detail="La cuota ya está pagada"
+                detail="No se puede registrar un pago sobre una cuota pagada, omitida o anulada"
             )
 
         if pago.monto <= 0:
@@ -370,6 +370,12 @@ def editar_pago(pago_id, pago, usuario_id):
             raise HTTPException(
                 status_code=400,
                 detail="No se puede editar un pago anulado"
+            )
+
+        if pago_actual["cuota_estado"] in ("OMITIDA", "ANULADA"):
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede editar un pago de una cuota omitida o anulada"
             )
 
         if pago.monto <= 0:
@@ -670,6 +676,12 @@ def anular_pago(pago_id, usuario_id):
             raise HTTPException(
                 status_code=400,
                 detail="El pago ya está anulado"
+            )
+
+        if pago_actual["cuota_estado"] in ("OMITIDA", "ANULADA"):
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede anular un pago de una cuota omitida o anulada"
             )
 
         total_cuota = obtener_total_cuota(
