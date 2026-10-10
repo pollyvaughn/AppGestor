@@ -55,9 +55,55 @@ def editar_categoria(categoria_id, categoria, usuario_id):
     conexion = get_connection()
 
     try:
-        cursor = conexion.cursor()
+        cursor = conexion.cursor(dictionary=True)
 
-        sql = """
+        cursor.execute(
+            """
+            SELECT tipo
+            FROM categoria
+            WHERE id = %s
+            AND usuario_id = %s
+            AND estado = TRUE
+            """,
+            (categoria_id, usuario_id)
+        )
+
+        categoria_actual = cursor.fetchone()
+
+        if not categoria_actual:
+            return 0
+
+        if categoria_actual["tipo"] != categoria.tipo:
+            cursor.execute(
+                """
+                SELECT id
+                FROM movimiento
+                WHERE categoria_id = %s
+                AND usuario_id = %s
+                LIMIT 1
+                """,
+                (categoria_id, usuario_id)
+            )
+
+            if cursor.fetchone():
+                return -1
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM recurrente
+                WHERE categoria_id = %s
+                AND usuario_id = %s
+                LIMIT 1
+                """,
+                (categoria_id, usuario_id)
+            )
+
+            if cursor.fetchone():
+                return -1
+
+        cursor.execute(
+            """
             UPDATE categoria
             SET nombre = %s,
                 tipo = %s,
@@ -65,20 +111,22 @@ def editar_categoria(categoria_id, categoria, usuario_id):
             WHERE id = %s
             AND usuario_id = %s
             AND estado = TRUE
-        """
-
-        valores = (
-            categoria.nombre,
-            categoria.tipo,
-            categoria.color,
-            categoria_id,
-            usuario_id
+            """,
+            (
+                categoria.nombre,
+                categoria.tipo,
+                categoria.color,
+                categoria_id,
+                usuario_id
+            )
         )
 
-        cursor.execute(sql, valores)
         conexion.commit()
-
         return cursor.rowcount
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()

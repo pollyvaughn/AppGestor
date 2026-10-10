@@ -50,7 +50,7 @@ export default function ColorPicker({
                             onClick={function () {
                                 onChange(color)
                             }}
-                            className="w-8 h-8 rounded-full"
+                            className="w-10 h-10 rounded-full"
                             style={{
                                 background: color,
                                 outline: activo ? `2px solid ${color}` : "none",

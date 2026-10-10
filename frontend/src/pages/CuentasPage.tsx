@@ -248,6 +248,7 @@ export default function CuentasPage() {
                                         <Button
                                             type="button"
                                             variant="secondary"
+                                            aria-label={`Editar ${cuenta.nombre}`}
                                             className="!py-1 !text-xs"
                                             onClick={function () {
                                                 abrirEdicion(cuenta)
@@ -259,6 +260,7 @@ export default function CuentasPage() {
                                         <Button
                                             type="button"
                                             variant="secondary"
+                                            aria-label={`Eliminar ${cuenta.nombre}`}
                                             className="!py-1 !text-xs"
                                             onClick={function () {
                                                 eliminar(cuenta)

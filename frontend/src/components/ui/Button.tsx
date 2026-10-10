@@ -29,7 +29,7 @@ export default function Button({
     return (
         <button
             {...props}
-            className={`px-3 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
+            className={`px-3 py-2 min-h-11 md:min-h-0 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
             style={{
                 ...estilos[variant],
                 borderRadius: "var(--radius-sm)",

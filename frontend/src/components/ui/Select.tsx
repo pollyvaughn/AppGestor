@@ -1,3 +1,5 @@
+import { useId } from "react"
+
 type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & {
     label?: string
 }
@@ -9,11 +11,14 @@ export default function Select({
     children,
     ...props
 }: SelectProps) {
+    const idAuto = useId()
+    const selectId = id ?? idAuto
+
     return (
         <div>
             {label && (
                 <label
-                    htmlFor={id}
+                    htmlFor={selectId}
                     className="block text-xs mb-1.5"
                     style={{
                         color: "var(--color-muted-foreground)",
@@ -27,15 +32,14 @@ export default function Select({
             )}
 
             <select
-                id={id}
+                id={selectId}
                 {...props}
-                className="w-full px-2.5 py-2 text-sm"
+                className="w-full px-2.5 py-2 text-base md:text-sm"
                 style={{
                     background: "var(--color-muted)",
                     border: "1px solid var(--color-border)",
                     borderRadius: "var(--radius-sm)",
                     color: "var(--color-foreground)",
-                    outline: "none",
                     ...style,
                 }}
             >
