@@ -8,7 +8,7 @@ from backend.services.compra_tarjeta_service import crear_compra_con_cursor
 def validar_referencias(cursor, recurrente, usuario_id):
     cursor.execute(
         """
-        SELECT id
+        SELECT id, tipo
         FROM categoria
         WHERE id = %s
         AND usuario_id = %s
@@ -17,8 +17,13 @@ def validar_referencias(cursor, recurrente, usuario_id):
         (recurrente.categoria_id, usuario_id)
     )
 
-    if not cursor.fetchone():
+    categoria = cursor.fetchone()
+
+    if not categoria:
         return "Categoría no encontrada"
+
+    if categoria["tipo"] != recurrente.tipo:
+        return "El tipo de la categoría no coincide con el tipo del recurrente"
 
     if recurrente.metodo_pago_id is not None:
         cursor.execute(
