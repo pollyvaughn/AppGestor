@@ -188,6 +188,7 @@ export default function CategoriasPage() {
                                 <Button
                                     type="button"
                                     variant="secondary"
+                                    aria-label={`Editar ${categoria.nombre}`}
                                     className="!py-1 !text-xs"
                                     onClick={function () {
                                         abrirEdicion(categoria)
@@ -199,6 +200,7 @@ export default function CategoriasPage() {
                                 <Button
                                     type="button"
                                     variant="secondary"
+                                    aria-label={`Eliminar ${categoria.nombre}`}
                                     className="!py-1 !text-xs"
                                     onClick={function () {
                                         eliminar(categoria)

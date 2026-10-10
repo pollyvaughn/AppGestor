@@ -17,7 +17,7 @@ body,
   --color-card: #FFFFFF;
   --color-card-foreground: #1C1C1A;
   --color-muted: #F0EDE8;
-  --color-muted-foreground: #7A7873;
+  --color-muted-foreground: #6B6964;
   --color-border: #E4E1DB;
   --color-primary: #1C1C1A;
   --color-primary-foreground: #F5F4F1;
@@ -43,9 +43,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Hide scrollbars by default */
+/* Foco visible para quien navega con teclado */
+:focus-visible {
+  outline: 2px solid var(--color-foreground);
+  outline-offset: 2px;
+}
+
+/* Scrollbars finos */
 ::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;

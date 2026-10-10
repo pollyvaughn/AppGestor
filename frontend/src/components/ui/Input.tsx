@@ -1,13 +1,18 @@
+import { useId } from "react"
+
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
     label?: string
 }
 
 export default function Input({ label, id, style, ...props }: InputProps) {
+    const idAuto = useId()
+    const inputId = id ?? idAuto
+
     return (
         <div>
             {label && (
                 <label
-                    htmlFor={id}
+                    htmlFor={inputId}
                     className="block text-xs mb-1.5"
                     style={{
                         color: "var(--color-muted-foreground)",
@@ -21,15 +26,14 @@ export default function Input({ label, id, style, ...props }: InputProps) {
             )}
 
             <input
-                id={id}
+                id={inputId}
                 {...props}
-                className="w-full px-2.5 py-2 text-sm"
+                className="w-full px-2.5 py-2 text-base md:text-sm"
                 style={{
                     background: "var(--color-muted)",
                     border: "1px solid var(--color-border)",
                     borderRadius: "var(--radius-sm)",
                     color: "var(--color-foreground)",
-                    outline: "none",
                     ...style,
                 }}
             />
