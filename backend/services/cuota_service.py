@@ -44,6 +44,24 @@ def omitir_cuota(cuota_id, usuario_id):
         if cuota["monto_pendiente"] <= 0:
             raise ValueError("La cuota no tiene saldo pendiente")
 
+        cursor.execute(
+            """
+            SELECT id
+            FROM pago
+            WHERE cuota_id = %s
+              AND estado = 'CONFIRMADO'
+            LIMIT 1
+            """,
+            (cuota_id,)
+        )
+
+        pago_confirmado = cursor.fetchone()
+
+        if pago_confirmado:
+            raise ValueError(
+                "No se puede omitir una cuota que tiene pagos confirmados"
+            )
+
         saldo_arrastrar = cuota["monto_pendiente"]
 
         cursor.execute(
