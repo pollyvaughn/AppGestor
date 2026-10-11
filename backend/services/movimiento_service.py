@@ -105,8 +105,7 @@ def crear_movimiento(movimiento, usuario_id):
         cursor.close()
         conexion.close()
 
-
-def listar_movimientos(usuario_id):
+def listar_movimientos(usuario_id, categoria_id=None):
     conexion = get_connection()
 
     try:
@@ -132,17 +131,23 @@ def listar_movimientos(usuario_id):
             LEFT JOIN metodo_pago mp
                 ON m.metodo_pago_id = mp.id
             WHERE m.usuario_id = %s
-            ORDER BY m.fecha DESC
         """
 
-        cursor.execute(sql, (usuario_id,))
+        valores = [usuario_id]
+
+        if categoria_id is not None:
+            sql += " AND m.categoria_id = %s"
+            valores.append(categoria_id)
+
+        sql += " ORDER BY m.fecha DESC"
+
+        cursor.execute(sql, tuple(valores))
 
         return cursor.fetchall()
 
     finally:
         cursor.close()
         conexion.close()
-
 
 def editar_movimiento(movimiento_id, movimiento, usuario_id):
     conexion = get_connection()

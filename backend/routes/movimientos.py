@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.auth.dependencies import obtener_usuario_actual
 from backend.models.movimiento import (
@@ -41,9 +41,14 @@ def crear(
 
 
 @router.get("/")
-def listar(usuario=Depends(obtener_usuario_actual)):
-    return listar_movimientos(usuario["id"])
-
+def listar(
+    categoria_id: int | None = Query(default=None, gt=0),
+    usuario=Depends(obtener_usuario_actual)
+):
+    return listar_movimientos(
+        usuario["id"],
+        categoria_id
+    )
 
 @router.put("/{movimiento_id}")
 def editar(
