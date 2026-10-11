@@ -7,14 +7,24 @@ type Tarjeta = {
     id: number
     nombre: string
     moneda: string
+    estado: string
 }
 
 export default function TarjetasYComprasPage() {
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
 
     async function cargarTarjetas() {
-        const datos = await listarTarjetas()
-        setTarjetas(datos)
+        try {
+            const datos: Tarjeta[] = await listarTarjetas()
+
+            // solo las activas se pueden usar para compras nuevas
+            setTarjetas(datos)
+                
+                
+        
+        } catch {
+            setTarjetas([])
+        }
     }
 
     useEffect(function () {
@@ -22,10 +32,10 @@ export default function TarjetasYComprasPage() {
     }, [])
 
     return (
-        <>
-            <TarjetasPage />
+        <div className="space-y-10">
+            <TarjetasPage onCambio={cargarTarjetas} />
 
             <ComprasTarjetaPage tarjetas={tarjetas} />
-        </>
+        </div>
     )
 }
