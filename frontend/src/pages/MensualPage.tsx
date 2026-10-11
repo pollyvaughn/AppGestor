@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react"
-import { listarMovimientos, crearMovimiento, editarMovimiento, eliminarMovimiento } from "../services/movimientoService"
+import {
+    listarMovimientos,
+    crearMovimiento,
+    editarMovimiento,
+    eliminarMovimiento,
+} from "../services/movimientoService"
 import { listarCategorias } from "../services/categoriaService"
 import { listarCuentas } from "../services/cuentaService"
 import {
@@ -23,6 +28,8 @@ import Mensaje from "../components/ui/Mensaje"
 
 type Tipo = "INGRESO" | "EGRESO"
 
+type Filtro = "TODOS" | Tipo
+
 type Categoria = { id: number; nombre: string; tipo: Tipo }
 
 type Cuenta = { id: number; nombre: string; tipo: string; moneda: string }
@@ -38,6 +45,19 @@ type Formulario = {
 }
 
 const MONEDAS = ["PYG", "USD", "EUR", "ARS", "BRL"]
+
+const FILTROS: { key: Filtro; label: string }[] = [
+    { key: "TODOS", label: "Todos" },
+    { key: "INGRESO", label: "Ingresos" },
+    { key: "EGRESO", label: "Gastos" },
+]
+
+// Texto para los movimientos que no son ingreso ni gasto
+const ETIQUETA_TIPO: Record<string, string> = {
+    TRANSFERENCIA: "Transferencia",
+    PAGO_TARJETA: "Pago de tarjeta",
+    AJUSTE: "Ajuste",
+}
 
 function fechaHoy() {
     const h = new Date()
@@ -63,6 +83,7 @@ export default function MensualPage() {
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [mes, setMes] = useState(mesActual())
+    const [filtro, setFiltro] = useState<Filtro>("TODOS")
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
@@ -238,7 +259,12 @@ export default function MensualPage() {
         return mesDe(m) === mes && m.estado !== "ANULADO"
     })
 
+    // los totales siempre cuentan todo el mes, sin importar el filtro
     const totales = totalesPorMoneda(delMes)
+
+    const visibles = delMes.filter(function (m) {
+        return filtro === "TODOS" || m.tipo === filtro
+    })
 
     const categoriasDelTipo = categorias.filter(function (c) {
         return c.tipo === formulario.tipo
@@ -262,22 +288,36 @@ export default function MensualPage() {
                 </Button>
             </div>
 
-            <div className="flex items-center justify-center gap-2">
+            {/* Selector de mes */}
+            <div className="flex items-end justify-center gap-2">
                 <Button
                     type="button"
                     variant="secondary"
+                    aria-label="Mes anterior"
                     onClick={function () {
                         setMes(moverMes(mes, -1))
                     }}
                 >
                     ‹
                 </Button>
-                <span className="text-sm w-36 text-center">
-                    {nombreMes(mes)}
-                </span>
+
+                <div className="w-44">
+                    <Input
+                        type="month"
+                        aria-label={`Mes: ${nombreMes(mes)}`}
+                        value={mes}
+                        onChange={function (e) {
+                            if (e.target.value) {
+                                setMes(e.target.value)
+                            }
+                        }}
+                    />
+                </div>
+
                 <Button
                     type="button"
                     variant="secondary"
+                    aria-label="Mes siguiente"
                     onClick={function () {
                         setMes(moverMes(mes, 1))
                     }}
@@ -311,7 +351,7 @@ export default function MensualPage() {
                                         Balance {moneda}
                                     </p>
                                     <p
-                                        className="text-2xl font-light"
+                                        className="text-2xl font-light break-words"
                                         style={{ fontFamily: "var(--font-mono)" }}
                                     >
                                         {formatearMonto(t.ingresos - t.egresos, moneda)}
@@ -328,19 +368,58 @@ export default function MensualPage() {
                     </div>
 
                     <section
-                        className="p-6"
+                        className="p-4 sm:p-6"
                         style={{
                             background: "var(--color-card)",
                             border: "1px solid var(--color-border)",
                             borderRadius: "var(--radius-lg)",
                         }}
                     >
-                        {delMes.length === 0 && (
-                            <EstadoVacio texto="Sin movimientos este mes." />
+                        {/* Filtro por tipo */}
+                        <div
+                            role="group"
+                            aria-label="Filtrar movimientos por tipo"
+                            className="flex flex-wrap gap-2 mb-4"
+                        >
+                            {FILTROS.map(function (f) {
+                                const activo = filtro === f.key
+
+                                return (
+                                    <Button
+                                        key={f.key}
+                                        type="button"
+                                        variant={activo ? "primary" : "secondary"}
+                                        aria-pressed={activo}
+                                        className="!py-1 !text-xs"
+                                        onClick={function () {
+                                            setFiltro(f.key)
+                                        }}
+                                    >
+                                        {f.label}
+                                    </Button>
+                                )
+                            })}
+                        </div>
+
+                        {visibles.length === 0 && (
+                            <EstadoVacio
+                                texto={
+                                    delMes.length === 0
+                                        ? "Sin movimientos este mes."
+                                        : "No hay movimientos de este tipo."
+                                }
+                            />
                         )}
 
-                        {delMes.map(function (m) {
-                            const esIngreso = m.tipo === "INGRESO"
+                        {visibles.map(function (m) {
+                            const signo =
+                                m.tipo === "INGRESO"
+                                    ? "+"
+                                    : m.tipo === "EGRESO"
+                                      ? "−"
+                                      : ""
+
+                            const etiquetaTipo = ETIQUETA_TIPO[m.tipo]
 
                             return (
                                 <div
@@ -350,14 +429,15 @@ export default function MensualPage() {
                                 >
                                     <div className="min-w-0">
                                         <p className="text-sm truncate">
-                                            {m.descripcion || m.categoria || m.tipo}
+                                            {m.descripcion || m.categoria || etiquetaTipo || m.tipo}
                                         </p>
                                         <p
                                             className="text-xs"
                                             style={{ color: "var(--color-muted-foreground)" }}
                                         >
-                                            {m.fecha.slice(0, 10)} · {m.categoria ?? "—"} ·{" "}
-                                            {m.metodo_pago ?? "—"}
+                                            {m.fecha.slice(0, 10)}
+                                            {etiquetaTipo ? ` · ${etiquetaTipo}` : ""} ·{" "}
+                                            {m.categoria ?? "—"} · {m.metodo_pago ?? "—"}
                                         </p>
                                     </div>
 
@@ -368,12 +448,12 @@ export default function MensualPage() {
                                                 fontFamily: "var(--font-mono)",
                                                 color: !esContable(m)
                                                     ? "var(--color-muted-foreground)"
-                                                    : esIngreso
+                                                    : m.tipo === "INGRESO"
                                                       ? "var(--color-income)"
                                                       : "var(--color-expense)",
                                             }}
                                         >
-                                            {esIngreso ? "+" : "−"}
+                                            {signo}
                                             {formatearMonto(m.monto, m.moneda)} {m.moneda}
                                         </span>
 
@@ -382,6 +462,7 @@ export default function MensualPage() {
                                                 <Button
                                                     type="button"
                                                     variant="secondary"
+                                                    aria-label={`Editar ${m.descripcion || m.categoria || "movimiento"}`}
                                                     className="!py-1 !text-xs"
                                                     onClick={function () {
                                                         abrirEdicion(m)
@@ -392,6 +473,7 @@ export default function MensualPage() {
                                                 <Button
                                                     type="button"
                                                     variant="secondary"
+                                                    aria-label={`Anular ${m.descripcion || m.categoria || "movimiento"}`}
                                                     className="!py-1 !text-xs"
                                                     onClick={function () {
                                                         anular(m)

@@ -137,8 +137,12 @@ export default function GlobalPage() {
             {!cargando && monedas.length > 0 && (
                 <>
                     {/* Selector de moneda */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs" style={estiloTitulo}>
+                    <div
+                        role="group"
+                        aria-label="Moneda"
+                        className="flex flex-wrap items-center gap-2"
+                    >
+                        <span className="text-xs" style={estiloTitulo} aria-hidden="true">
                             Moneda
                         </span>
 
@@ -149,10 +153,11 @@ export default function GlobalPage() {
                                 <button
                                     key={mon}
                                     type="button"
+                                    aria-pressed={activa}
                                     onClick={function () {
                                         setMonedaElegida(mon)
                                     }}
-                                    className="px-3 py-1.5 text-xs"
+                                    className="px-3 py-1.5 min-h-11 md:min-h-0 text-xs"
                                     style={{
                                         borderRadius: "var(--radius-sm)",
                                         border: "1px solid var(--color-border)",
@@ -191,12 +196,13 @@ export default function GlobalPage() {
                     </div>
 
                     {/* Evolución mensual */}
-                    <section className="p-6" style={estiloCard}>
+                    <section className="p-4 sm:p-6" style={estiloCard}>
                         <h2 className="text-xs mb-5" style={estiloTitulo}>
                             Evolución mensual
                         </h2>
 
-                        <div className="overflow-x-auto">
+                        {/* El gráfico es solo visual: los mismos datos están en la tabla de abajo */}
+                        <div className="overflow-x-auto" aria-hidden="true">
                             <div className="flex items-end gap-3" style={{ minWidth: "min-content" }}>
                                 {meses.map(function (mes) {
                                     const d = porMes[mes]
@@ -213,7 +219,6 @@ export default function GlobalPage() {
                                             >
                                                 <div
                                                     className="flex-1"
-                                                    title={`Ingresos: ${formatearMonto(d.ingresos, moneda)}`}
                                                     style={{
                                                         height: `${(d.ingresos / maximoMes) * 100}%`,
                                                         minHeight: d.ingresos > 0 ? "2px" : "0",
@@ -223,7 +228,6 @@ export default function GlobalPage() {
                                                 />
                                                 <div
                                                     className="flex-1"
-                                                    title={`Gastos: ${formatearMonto(d.egresos, moneda)}`}
                                                     style={{
                                                         height: `${(d.egresos / maximoMes) * 100}%`,
                                                         minHeight: d.egresos > 0 ? "2px" : "0",
@@ -233,11 +237,10 @@ export default function GlobalPage() {
                                                 />
                                             </div>
                                             <span
-                                                className="text-xs"
                                                 style={{
                                                     color: "var(--color-muted-foreground)",
                                                     fontFamily: "var(--font-mono)",
-                                                    fontSize: "10px",
+                                                    fontSize: "11px",
                                                 }}
                                             >
                                                 {etiquetaMes(mes)}
@@ -258,10 +261,57 @@ export default function GlobalPage() {
                                 Gastos
                             </span>
                         </div>
+
+                        <details className="mt-4 text-sm">
+                            <summary className="cursor-pointer min-h-11 md:min-h-0 flex items-center">
+                                Ver datos en tabla
+                            </summary>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full mt-2 text-xs">
+                                    <caption className="sr-only">
+                                        Ingresos y gastos por mes en {moneda}
+                                    </caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col" className="text-left py-1">Mes</th>
+                                            <th scope="col" className="text-right py-1">Ingresos</th>
+                                            <th scope="col" className="text-right py-1">Gastos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody style={{ fontFamily: "var(--font-mono)" }}>
+                                        {meses.map(function (mes) {
+                                            return (
+                                                <tr
+                                                    key={mes}
+                                                    style={{ borderTop: "1px solid var(--color-border)" }}
+                                                >
+                                                    <th scope="row" className="text-left font-normal py-1.5">
+                                                        {etiquetaMes(mes)}
+                                                    </th>
+                                                    <td
+                                                        className="text-right py-1.5"
+                                                        style={{ color: "var(--color-income)" }}
+                                                    >
+                                                        {formatearMonto(porMes[mes].ingresos, moneda)}
+                                                    </td>
+                                                    <td
+                                                        className="text-right py-1.5"
+                                                        style={{ color: "var(--color-expense)" }}
+                                                    >
+                                                        {formatearMonto(porMes[mes].egresos, moneda)}
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
                     </section>
 
                     {/* Gastos por categoría */}
-                    <section className="p-6" style={estiloCard}>
+                    <section className="p-4 sm:p-6" style={estiloCard}>
                         <h2 className="text-xs mb-5" style={estiloTitulo}>
                             Gastos por categoría
                         </h2>
@@ -286,6 +336,7 @@ export default function GlobalPage() {
                                         <div
                                             className="h-1.5 w-full rounded-full"
                                             style={{ background: "var(--color-muted)" }}
+                                            aria-hidden="true"
                                         >
                                             <div
                                                 className="h-full rounded-full"
