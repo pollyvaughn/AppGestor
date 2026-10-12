@@ -12,19 +12,22 @@ type Tarjeta = {
 
 export default function TarjetasYComprasPage() {
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
+    const [version, setVersion] = useState(0)
 
     async function cargarTarjetas() {
         try {
-            const datos: Tarjeta[] = await listarTarjetas()
-
-            // solo las activas se pueden usar para compras nuevas
-            setTarjetas(datos)
-                
-                
-        
+            setTarjetas(await listarTarjetas())
         } catch {
             setTarjetas([])
         }
+    }
+
+    // vuelve a cargar también el panel de tarjetas (deuda y disponible)
+    function refrescarTodo() {
+        setVersion(function (v) {
+            return v + 1
+        })
+        cargarTarjetas()
     }
 
     useEffect(function () {
@@ -33,9 +36,9 @@ export default function TarjetasYComprasPage() {
 
     return (
         <div className="space-y-10">
-            <TarjetasPage onCambio={cargarTarjetas} />
+            <TarjetasPage key={version} onCambio={cargarTarjetas} />
 
-            <ComprasTarjetaPage tarjetas={tarjetas} />
+            <ComprasTarjetaPage tarjetas={tarjetas} onCambio={refrescarTodo} />
         </div>
     )
 }

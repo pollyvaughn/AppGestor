@@ -4,10 +4,23 @@ import {
     crearRecurrente,
     editarRecurrente,
     eliminarRecurrente,
-    generarMovimiento
+    generarMovimiento,
 } from "../services/recurrenteService"
 import { listarCategorias } from "../services/categoriaService"
 import { listarCuentas } from "../services/cuentaService"
+import Button from "../components/ui/Button"
+import Input from "../components/ui/Input"
+import Modal from "../components/ui/Modal"
+import MontoInput from "../components/ui/MontoInput"
+import Select from "../components/ui/Select"
+import Cargando from "../components/ui/Cargando"
+import EstadoVacio from "../components/ui/EstadoVacio"
+import Mensaje from "../components/ui/Mensaje"
+import { formatearMonto } from "../lib/moneda"
+
+type Tipo = "INGRESO" | "EGRESO"
+
+type Filtro = "TODOS" | Tipo
 
 type Recurrente = {
     id: number
@@ -16,192 +29,249 @@ type Recurrente = {
     metodo_pago_id: number | null
     metodo_pago: string | null
     nombre: string
-    tipo: string
+    tipo: Tipo
     monto_base: number
     moneda: string
     frecuencia: string
     proxima_fecha: string | null
-    estado: string
 }
 
-type Categoria = {
-    id: number
-    nombre: string
-    tipo: string
-}
+type Categoria = { id: number; nombre: string; tipo: Tipo }
 
-type MetodoPago = {
+type Cuenta = {
     id: number
     nombre: string
     tipo: string
     moneda: string
-    estado: string
+    saldo: number
 }
 
-type FormularioRecurrente = {
-    categoria_id: string
-    metodo_pago_id: string
+type Formulario = {
     nombre: string
-    tipo: string
-    monto_base: string
+    tipo: Tipo
+    categoriaId: string
+    cuentaId: string
     moneda: string
+    monto: string
     frecuencia: string
-    proxima_fecha: string
+    proximaFecha: string
 }
 
-type FiltroTipo = "" | "INGRESO" | "EGRESO"
+const MONEDAS = ["PYG", "USD", "EUR", "ARS", "BRL"]
 
-const formularioInicial: FormularioRecurrente = {
-    categoria_id: "",
-    metodo_pago_id: "",
-    nombre: "",
-    tipo: "EGRESO",
-    monto_base: "",
-    moneda: "PYG",
-    frecuencia: "MENSUAL",
-    proxima_fecha: ""
+const FILTROS: { key: Filtro; label: string }[] = [
+    { key: "TODOS", label: "Todos" },
+    { key: "INGRESO", label: "Ingresos" },
+    { key: "EGRESO", label: "Gastos" },
+]
+
+const FRECUENCIAS: { key: string; label: string }[] = [
+    { key: "DIARIA", label: "Diaria" },
+    { key: "SEMANAL", label: "Semanal" },
+    { key: "QUINCENAL", label: "Quincenal" },
+    { key: "MENSUAL", label: "Mensual" },
+    { key: "BIMESTRAL", label: "Bimestral" },
+    { key: "TRIMESTRAL", label: "Trimestral" },
+    { key: "SEMESTRAL", label: "Semestral" },
+    { key: "ANUAL", label: "Anual" },
+]
+
+function etiquetaFrecuencia(clave: string) {
+    const frecuencia = FRECUENCIAS.find(function (f) {
+        return f.key === clave
+    })
+
+    return frecuencia ? frecuencia.label : clave
+}
+
+function fechaHoy() {
+    const h = new Date()
+    const mes = String(h.getMonth() + 1).padStart(2, "0")
+    const dia = String(h.getDate()).padStart(2, "0")
+    return `${h.getFullYear()}-${mes}-${dia}`
+}
+
+// "2026-11-10" => "10/11/2026"
+function fechaCorta(fecha: string) {
+    const f = fecha.slice(0, 10)
+    return `${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(0, 4)}`
+}
+
+function formularioVacio(): Formulario {
+    return {
+        nombre: "",
+        tipo: "EGRESO",
+        categoriaId: "",
+        cuentaId: "",
+        moneda: "PYG",
+        monto: "",
+        frecuencia: "MENSUAL",
+        proximaFecha: fechaHoy(),
+    }
 }
 
 export default function RecurrentesPage() {
     const [recurrentes, setRecurrentes] = useState<Recurrente[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
-    const [metodosPago, setMetodosPago] = useState<MetodoPago[]>([])
-
-    const [formulario, setFormulario] = useState<FormularioRecurrente>(
-        formularioInicial
-    )
-    const [recurrenteEditando, setRecurrenteEditando] =
-        useState<number | null>(null)
-
-    const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("")
-
+    const [cuentas, setCuentas] = useState<Cuenta[]>([])
+    const [filtro, setFiltro] = useState<Filtro>("TODOS")
+    const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
 
-    async function cargarRecurrentes(tipo: FiltroTipo) {
+    // crear / editar
+    const [modalAbierto, setModalAbierto] = useState(false)
+    const [editando, setEditando] = useState<number | null>(null)
+    const [formulario, setFormulario] = useState<Formulario>(formularioVacio())
+
+    // generar movimiento
+    const [generando, setGenerando] = useState<Recurrente | null>(null)
+    const [montoGenerar, setMontoGenerar] = useState("")
+
+    const [errorModal, setErrorModal] = useState("")
+
+    // ---------- Carga de datos ----------
+
+    async function cargar() {
         try {
-            const datos = await listarRecurrentes(
-                tipo === "" ? undefined : tipo
+            const [recs, cats, ctas] = await Promise.all([
+                listarRecurrentes(),
+                listarCategorias(),
+                listarCuentas(),
+            ])
+            setRecurrentes(recs)
+            setCategorias(cats)
+            setCuentas(ctas)
+        } catch (e) {
+            setError(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudieron cargar los recurrentes"
             )
-            setRecurrentes(datos)
-        } catch {
-            setError("No se pudieron cargar los recurrentes")
-        }
-    }
-
-    async function cargarOpciones() {
-        try {
-            const categoriasDatos = await listarCategorias()
-            const metodosDatos = await listarCuentas()
-
-            setCategorias(categoriasDatos)
-            setMetodosPago(metodosDatos)
-        } catch {
-            setError("No se pudieron cargar las categorías y métodos de pago")
+        } finally {
+            setCargando(false)
         }
     }
 
     useEffect(function () {
-        cargarOpciones()
+        cargar()
     }, [])
 
-    useEffect(function () {
-        cargarRecurrentes(filtroTipo)
-    }, [filtroTipo])
+    // ---------- Formulario: crear y editar ----------
 
-    function manejarCambio(
-        evento: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-    ) {
-        const { name, value } = evento.target
+    function abrirNuevo() {
+        setEditando(null)
+        setFormulario(formularioVacio())
+        setErrorModal("")
+        setModalAbierto(true)
+    }
 
-        setFormulario(function (actual) {
-            if (name === "tipo") {
-                return {
-                    ...actual,
-                    tipo: value,
-                    categoria_id: ""
-                }
-            }
+    function abrirEdicion(r: Recurrente) {
+        setEditando(r.id)
+        setFormulario({
+            nombre: r.nombre,
+            tipo: r.tipo,
+            categoriaId: String(r.categoria_id),
+            cuentaId: r.metodo_pago_id ? String(r.metodo_pago_id) : "",
+            moneda: r.moneda,
+            monto: String(Number(r.monto_base)),
+            frecuencia: r.frecuencia,
+            proximaFecha: r.proxima_fecha ? r.proxima_fecha.slice(0, 10) : "",
+        })
+        setErrorModal("")
+        setModalAbierto(true)
+    }
 
-            return {
-                ...actual,
-                [name]: value
-            }
+    function cambiarTipo(tipo: Tipo) {
+        const cuentaActual = cuentas.find(function (c) {
+            return String(c.id) === formulario.cuentaId
+        })
+
+        // la tarjeta de crédito solo sirve para gastos
+        const sacarCuenta =
+            tipo === "INGRESO" &&
+            cuentaActual !== undefined &&
+            cuentaActual.tipo === "TARJETA_CREDITO"
+
+        setFormulario({
+            ...formulario,
+            tipo: tipo,
+            categoriaId: "", // la categoría anterior ya no sirve
+            cuentaId: sacarCuenta ? "" : formulario.cuentaId,
         })
     }
 
-    function limpiarFormulario() {
-        setFormulario(formularioInicial)
-        setRecurrenteEditando(null)
+    function cambiarCuenta(cuentaId: string) {
+        const cuenta = cuentas.find(function (c) {
+            return String(c.id) === cuentaId
+        })
+
+        setFormulario({
+            ...formulario,
+            cuentaId: cuentaId,
+            // si eligió cuenta, la moneda es la de la cuenta
+            moneda: cuenta ? cuenta.moneda : formulario.moneda,
+        })
     }
 
-    async function manejarSubmit(
-        evento: React.FormEvent<HTMLFormElement>
-    ) {
-        evento.preventDefault()
+    function cambiarMoneda(moneda: string) {
+        setFormulario({
+            ...formulario,
+            moneda: moneda,
+            // guaraníes no tienen decimales
+            monto:
+                moneda === "PYG"
+                    ? String(Math.trunc(Number(formulario.monto || 0)))
+                    : formulario.monto,
+        })
+    }
 
+    async function guardar(evento: React.FormEvent<HTMLFormElement>) {
+        evento.preventDefault()
+        setErrorModal("")
         setError("")
         setMensaje("")
 
+        if (Number(formulario.monto) <= 0) {
+            setErrorModal("El monto debe ser mayor a 0")
+            return
+        }
+
         const datos = {
-            categoria_id: Number(formulario.categoria_id),
-            metodo_pago_id:
-                formulario.metodo_pago_id === ""
-                    ? null
-                    : Number(formulario.metodo_pago_id),
+            categoria_id: Number(formulario.categoriaId),
+            metodo_pago_id: Number(formulario.cuentaId) || null,
             nombre: formulario.nombre,
             tipo: formulario.tipo,
-            monto_base: Number(formulario.monto_base),
+            monto_base: Number(formulario.monto),
             moneda: formulario.moneda,
             frecuencia: formulario.frecuencia,
-            proxima_fecha:
-                formulario.proxima_fecha === ""
-                    ? null
-                    : formulario.proxima_fecha
+            proxima_fecha: formulario.proximaFecha || null,
         }
 
         try {
-            if (recurrenteEditando === null) {
+            if (editando === null) {
                 await crearRecurrente(datos)
-                setMensaje("Recurrente creado correctamente")
+                setMensaje("Recurrente creado")
             } else {
-                await editarRecurrente(recurrenteEditando, datos)
-                setMensaje("Recurrente actualizado correctamente")
+                await editarRecurrente(editando, datos)
+                setMensaje("Recurrente actualizado")
             }
 
-            limpiarFormulario()
-            await cargarRecurrentes(filtroTipo)
-        } catch (error) {
-            if (error instanceof Error) {
-                setError(error.message)
-            } else {
-                setError("No se pudo guardar el recurrente")
-            }
+            setModalAbierto(false)
+            await cargar()
+        } catch (e) {
+            setErrorModal(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudo guardar el recurrente"
+            )
         }
     }
 
-    function prepararEdicion(recurrente: Recurrente) {
-        setRecurrenteEditando(recurrente.id)
+    // ---------- Desactivar ----------
 
-        setFormulario({
-            categoria_id: String(recurrente.categoria_id),
-            metodo_pago_id:
-                recurrente.metodo_pago_id === null
-                    ? ""
-                    : String(recurrente.metodo_pago_id),
-            nombre: recurrente.nombre,
-            tipo: recurrente.tipo,
-            monto_base: String(recurrente.monto_base),
-            moneda: recurrente.moneda,
-            frecuencia: recurrente.frecuencia,
-            proxima_fecha: recurrente.proxima_fecha ?? ""
-        })
-    }
-
-    async function manejarEliminar(id: number) {
-        const confirmar = window.confirm(
-            "¿Querés desactivar este recurrente?"
-        )
+    async function desactivar(r: Recurrente) {
+        const confirmar = window.confirm(`¿Desactivar "${r.nombre}"?`)
 
         if (!confirmar) {
             return
@@ -211,289 +281,481 @@ export default function RecurrentesPage() {
         setMensaje("")
 
         try {
-            await eliminarRecurrente(id)
-
-            setMensaje("Recurrente desactivado correctamente")
-
-            if (recurrenteEditando === id) {
-                limpiarFormulario()
-            }
-
-            await cargarRecurrentes(filtroTipo)
-        } catch (error) {
-            if (error instanceof Error) {
-                setError(error.message)
-            } else {
-                setError("No se pudo desactivar el recurrente")
-            }
+            await eliminarRecurrente(r.id)
+            setMensaje("Recurrente desactivado")
+            await cargar()
+        } catch (e) {
+            setError(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudo desactivar el recurrente"
+            )
         }
     }
 
-    async function manejarGenerar(recurrente: Recurrente) {
-        setError("")
-        setMensaje("")
+    // ---------- Generar movimiento ----------
 
-        const respuesta = window.prompt(
-            "Monto de este período. Si lo cambiás, el nuevo monto pasa a ser el monto base de los períodos siguientes.",
-            String(recurrente.monto_base)
-        )
+    function puedeGenerar(r: Recurrente) {
+        return r.proxima_fecha !== null && r.proxima_fecha.slice(0, 10) <= fechaHoy()
+    }
 
-        if (respuesta === null) {
+    function abrirGenerar(r: Recurrente) {
+        setGenerando(r)
+        setMontoGenerar(String(Number(r.monto_base)))
+        setErrorModal("")
+    }
+
+    async function confirmarGenerar(evento: React.FormEvent<HTMLFormElement>) {
+        evento.preventDefault()
+
+        if (generando === null) {
             return
         }
 
-        let monto: number | undefined = undefined
+        setErrorModal("")
+        setError("")
+        setMensaje("")
 
-        if (respuesta.trim() !== "") {
-            monto = Number(respuesta)
+        const monto = Number(montoGenerar)
 
-            if (Number.isNaN(monto) || monto <= 0) {
-                setError("El monto debe ser un número mayor a 0")
-                return
-            }
+        if (monto <= 0) {
+            setErrorModal("El monto debe ser mayor a 0")
+            return
+        }
+
+        // efectivo y billetera no pueden quedar en negativo (regla del backend)
+        const cuenta = cuentas.find(function (c) {
+            return c.id === generando.metodo_pago_id
+        })
+
+        if (
+            generando.tipo === "EGRESO" &&
+            cuenta &&
+            (cuenta.tipo === "EFECTIVO" || cuenta.tipo === "BILLETERA") &&
+            Number(cuenta.saldo) < monto
+        ) {
+            setErrorModal(`Saldo insuficiente en ${cuenta.nombre}`)
+            return
         }
 
         try {
-            const resultado = await generarMovimiento(
-                recurrente.id,
-                monto
-            )
+            const resultado = await generarMovimiento(generando.id, monto)
 
             setMensaje(
-                `Movimiento generado. Próxima fecha: ${resultado.proxima_fecha}`
+                `Movimiento generado. Próxima fecha: ${fechaCorta(resultado.proxima_fecha)}`
             )
-
-            await cargarRecurrentes(filtroTipo)
-        } catch (error) {
-            if (error instanceof Error) {
-                setError(error.message)
-            } else {
-                setError("No se pudo generar el movimiento")
-            }
+            setGenerando(null)
+            await cargar()
+        } catch (e) {
+            setErrorModal(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudo generar el movimiento"
+            )
         }
     }
 
+    // ---------- Datos calculados ----------
+
+    const visibles = recurrentes.filter(function (r) {
+        return filtro === "TODOS" || r.tipo === filtro
+    })
+
+    const categoriasDelTipo = categorias.filter(function (c) {
+        return c.tipo === formulario.tipo
+    })
+
+    const cuentasUsables = cuentas.filter(function (c) {
+        return !(formulario.tipo === "INGRESO" && c.tipo === "TARJETA_CREDITO")
+    })
+
+    const cuentaElegida = formulario.cuentaId !== ""
+
+    // ---------- Pantalla ----------
+
     return (
-        <main>
-            <h1>Recurrentes</h1>
+        <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-lg font-medium">Recurrentes</h1>
 
-            {error && <p>{error}</p>}
-            {mensaje && <p>{mensaje}</p>}
+                <Button type="button" onClick={abrirNuevo}>
+                    + Nuevo recurrente
+                </Button>
+            </div>
 
-            <section>
-                <h2>
-                    {recurrenteEditando === null
-                        ? "Nuevo recurrente"
-                        : "Editar recurrente"}
-                </h2>
+            <div
+                role="group"
+                aria-label="Filtrar recurrentes por tipo"
+                className="flex flex-wrap gap-2"
+            >
+                {FILTROS.map(function (f) {
+                    const activo = filtro === f.key
 
-                <form onSubmit={manejarSubmit}>
-                    <input
-                        name="nombre"
-                        placeholder="Nombre"
-                        value={formulario.nombre}
-                        onChange={manejarCambio}
-                        required
-                    />
-
-                    <select
-                        name="tipo"
-                        value={formulario.tipo}
-                        onChange={manejarCambio}
-                    >
-                        <option value="EGRESO">Egreso</option>
-                        <option value="INGRESO">Ingreso</option>
-                    </select>
-
-                    <select
-                        name="categoria_id"
-                        value={formulario.categoria_id}
-                        onChange={manejarCambio}
-                        required
-                    >
-                        <option value="">Seleccioná una categoría</option>
-
-                        {categorias
-                            .filter(function (categoria) {
-                                return categoria.tipo === formulario.tipo
-                            })
-                            .map(function (categoria) {
-                                return (
-                                    <option
-                                        key={categoria.id}
-                                        value={categoria.id}
-                                    >
-                                        {categoria.nombre}
-                                    </option>
-                                )
-                            })}
-                    </select>
-
-                    <select
-                        name="metodo_pago_id"
-                        value={formulario.metodo_pago_id}
-                        onChange={manejarCambio}
-                    >
-                        <option value="">Sin método de pago</option>
-
-                        {metodosPago
-                            .filter(function (metodo) {
-                                return metodo.estado === "ACTIVO"
-                            })
-                            .map(function (metodo) {
-                                return (
-                                    <option
-                                        key={metodo.id}
-                                        value={metodo.id}
-                                    >
-                                        {metodo.nombre} ({metodo.tipo})
-                                    </option>
-                                )
-                            })}
-                    </select>
-
-                    <input
-                        name="monto_base"
-                        type="number"
-                        placeholder="Monto base"
-                        value={formulario.monto_base}
-                        onChange={manejarCambio}
-                        min="0"
-                        step="0.01"
-                        required
-                    />
-
-                    <select
-                        name="moneda"
-                        value={formulario.moneda}
-                        onChange={manejarCambio}
-                    >
-                        <option value="PYG">PYG</option>
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                        <option value="ARS">ARS</option>
-                        <option value="BRL">BRL</option>
-                    </select>
-
-                    <select
-                        name="frecuencia"
-                        value={formulario.frecuencia}
-                        onChange={manejarCambio}
-                    >
-                        <option value="DIARIA">Diaria</option>
-                        <option value="SEMANAL">Semanal</option>
-                        <option value="QUINCENAL">Quincenal</option>
-                        <option value="MENSUAL">Mensual</option>
-                        <option value="BIMESTRAL">Bimestral</option>
-                        <option value="TRIMESTRAL">Trimestral</option>
-                        <option value="SEMESTRAL">Semestral</option>
-                        <option value="ANUAL">Anual</option>
-                    </select>
-
-                    <input
-                        name="proxima_fecha"
-                        type="date"
-                        value={formulario.proxima_fecha}
-                        onChange={manejarCambio}
-                    />
-
-                    <button type="submit">
-                        {recurrenteEditando === null
-                            ? "Crear recurrente"
-                            : "Guardar cambios"}
-                    </button>
-
-                    {recurrenteEditando !== null && (
-                        <button
+                    return (
+                        <Button
+                            key={f.key}
                             type="button"
-                            onClick={limpiarFormulario}
+                            variant={activo ? "primary" : "secondary"}
+                            aria-pressed={activo}
+                            className="!py-1 !text-xs"
+                            onClick={function () {
+                                setFiltro(f.key)
+                            }}
                         >
-                            Cancelar
-                        </button>
-                    )}
-                </form>
-            </section>
+                            {f.label}
+                        </Button>
+                    )
+                })}
+            </div>
 
-            <section>
-                <h2>Recurrentes registrados</h2>
+            {error && <Mensaje tipo="error">{error}</Mensaje>}
+            {mensaje && <Mensaje tipo="exito">{mensaje}</Mensaje>}
+            {cargando && <Cargando />}
 
-                <select
-                    value={filtroTipo}
-                    onChange={function (evento) {
-                        setFiltroTipo(evento.target.value as FiltroTipo)
-                    }}
-                >
-                    <option value="">Todos</option>
-                    <option value="INGRESO">Ingresos</option>
-                    <option value="EGRESO">Egresos</option>
-                </select>
+            {!cargando && visibles.length === 0 && (
+                <EstadoVacio
+                    texto={
+                        recurrentes.length === 0
+                            ? "No tenés recurrentes registrados."
+                            : "No hay recurrentes de este tipo."
+                    }
+                />
+            )}
 
-                {recurrentes.length === 0 ? (
-                    <p>No tenés recurrentes registrados.</p>
-                ) : (
-                    recurrentes.map(function (recurrente) {
-                        return (
-                            <article key={recurrente.id}>
-                                <h3>{recurrente.nombre}</h3>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                {visibles.map(function (r) {
+                    const esIngreso = r.tipo === "INGRESO"
+                    const generable = puedeGenerar(r)
 
-                                <p>
-                                    Tipo: {recurrente.tipo}
+                    return (
+                        <div
+                            key={r.id}
+                            className="p-5 flex flex-col gap-3"
+                            style={{
+                                background: "var(--color-card)",
+                                border: "1px solid var(--color-border)",
+                                borderRadius: "var(--radius-lg)",
+                            }}
+                        >
+                            <div>
+                                <p className="text-sm font-medium break-words">
+                                    {r.nombre}
                                 </p>
 
-                                <p>
-                                    Categoría: {recurrente.categoria}
+                                <p
+                                    className="text-xs"
+                                    style={{
+                                        color: "var(--color-muted-foreground)",
+                                    }}
+                                >
+                                    {r.categoria} ·{" "}
+                                    {etiquetaFrecuencia(r.frecuencia)} ·{" "}
+                                    {r.metodo_pago ?? "Sin cuenta"}
                                 </p>
+                            </div>
 
-                                <p>
-                                    Método de pago:{" "}
-                                    {recurrente.metodo_pago ?? "Sin definir"}
-                                </p>
+                            <p
+                                className="text-2xl font-light break-words"
+                                style={{
+                                    fontFamily: "var(--font-mono)",
+                                    color: esIngreso
+                                        ? "var(--color-income)"
+                                        : "var(--color-expense)",
+                                }}
+                            >
+                                {esIngreso ? "+" : "−"}
+                                {formatearMonto(r.monto_base, r.moneda)}{" "}
+                                <span className="text-sm">{r.moneda}</span>
+                            </p>
 
-                                <p>
-                                    Monto base:{" "}
-                                    {recurrente.monto_base.toLocaleString(
-                                        "es-PY"
-                                    )}{" "}
-                                    {recurrente.moneda}
-                                </p>
+                            <p
+                                className="text-xs"
+                                style={{
+                                    color: generable
+                                        ? "var(--color-expense)"
+                                        : "var(--color-muted-foreground)",
+                                }}
+                            >
+                                {r.proxima_fecha === null
+                                    ? "Sin próxima fecha"
+                                    : generable
+                                      ? `Para generar desde el ${fechaCorta(r.proxima_fecha)}`
+                                      : `Próxima fecha: ${fechaCorta(r.proxima_fecha)}`}
+                            </p>
 
-                                <p>
-                                    Frecuencia: {recurrente.frecuencia}
-                                </p>
-
-                                <p>
-                                    Próxima fecha:{" "}
-                                    {recurrente.proxima_fecha ?? "No definida"}
-                                </p>
-
-                                <button
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    className="!py-1 !text-xs"
+                                    disabled={!generable}
+                                    aria-label={`Generar movimiento de ${r.nombre}`}
                                     onClick={function () {
-                                        manejarGenerar(recurrente)
+                                        abrirGenerar(r)
                                     }}
                                 >
                                     Generar movimiento
-                                </button>
+                                </Button>
 
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="!py-1 !text-xs"
+                                    aria-label={`Editar ${r.nombre}`}
                                     onClick={function () {
-                                        prepararEdicion(recurrente)
+                                        abrirEdicion(r)
                                     }}
                                 >
                                     Editar
-                                </button>
+                                </Button>
 
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="!py-1 !text-xs"
+                                    aria-label={`Desactivar ${r.nombre}`}
                                     onClick={function () {
-                                        manejarEliminar(recurrente.id)
+                                        desactivar(r)
                                     }}
                                 >
                                     Desactivar
-                                </button>
-                            </article>
-                        )
-                    })
+                                </Button>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Modal: crear / editar */}
+            <Modal
+                open={modalAbierto}
+                title={
+                    editando === null ? "Nuevo recurrente" : "Editar recurrente"
+                }
+                onClose={function () {
+                    setModalAbierto(false)
+                }}
+            >
+                <form onSubmit={guardar} className="space-y-4">
+                    <Input
+                        id="nombre"
+                        label="Nombre"
+                        value={formulario.nombre}
+                        onChange={function (e) {
+                            setFormulario({
+                                ...formulario,
+                                nombre: e.target.value,
+                            })
+                        }}
+                        placeholder="Ej. Alquiler"
+                        required
+                        autoFocus
+                    />
+
+                    <Select
+                        id="tipo"
+                        label="Tipo"
+                        value={formulario.tipo}
+                        onChange={function (e) {
+                            cambiarTipo(e.target.value as Tipo)
+                        }}
+                    >
+                        <option value="EGRESO">Egreso</option>
+                        <option value="INGRESO">Ingreso</option>
+                    </Select>
+
+                    <Select
+                        id="categoria"
+                        label="Categoría"
+                        value={formulario.categoriaId}
+                        onChange={function (e) {
+                            setFormulario({
+                                ...formulario,
+                                categoriaId: e.target.value,
+                            })
+                        }}
+                        required
+                    >
+                        <option value="">Elegí una categoría</option>
+                        {categoriasDelTipo.map(function (c) {
+                            return (
+                                <option key={c.id} value={c.id}>
+                                    {c.nombre}
+                                </option>
+                            )
+                        })}
+                    </Select>
+
+                    <Select
+                        id="cuenta"
+                        label="Cuenta"
+                        value={formulario.cuentaId}
+                        onChange={function (e) {
+                            cambiarCuenta(e.target.value)
+                        }}
+                    >
+                        <option value="">Sin cuenta</option>
+                        {cuentasUsables.map(function (c) {
+                            return (
+                                <option key={c.id} value={c.id}>
+                                    {c.nombre} ({c.moneda})
+                                </option>
+                            )
+                        })}
+                    </Select>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {!cuentaElegida && (
+                            <Select
+                                id="moneda"
+                                label="Moneda"
+                                value={formulario.moneda}
+                                onChange={function (e) {
+                                    cambiarMoneda(e.target.value)
+                                }}
+                            >
+                                {MONEDAS.map(function (mon) {
+                                    return (
+                                        <option key={mon} value={mon}>
+                                            {mon}
+                                        </option>
+                                    )
+                                })}
+                            </Select>
+                        )}
+
+                        <MontoInput
+                            id="monto"
+                            label={`Monto base (${formulario.moneda})`}
+                            moneda={formulario.moneda}
+                            value={formulario.monto}
+                            onChange={function (valor) {
+                                setFormulario({ ...formulario, monto: valor })
+                            }}
+                            required
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Select
+                            id="frecuencia"
+                            label="Frecuencia"
+                            value={formulario.frecuencia}
+                            onChange={function (e) {
+                                setFormulario({
+                                    ...formulario,
+                                    frecuencia: e.target.value,
+                                })
+                            }}
+                        >
+                            {FRECUENCIAS.map(function (f) {
+                                return (
+                                    <option key={f.key} value={f.key}>
+                                        {f.label}
+                                    </option>
+                                )
+                            })}
+                        </Select>
+
+                        <Input
+                            id="proxima-fecha"
+                            label="Próxima fecha"
+                            type="date"
+                            value={formulario.proximaFecha}
+                            onChange={function (e) {
+                                setFormulario({
+                                    ...formulario,
+                                    proximaFecha: e.target.value,
+                                })
+                            }}
+                        />
+                    </div>
+
+                    {errorModal && <Mensaje tipo="error">{errorModal}</Mensaje>}
+
+                    <div className="flex gap-2 pt-1">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={function () {
+                                setModalAbierto(false)
+                            }}
+                        >
+                            Cancelar
+                        </Button>
+
+                        <Button type="submit" className="flex-1">
+                            Guardar
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Modal: generar movimiento */}
+            <Modal
+                open={generando !== null}
+                title="Generar movimiento"
+                onClose={function () {
+                    setGenerando(null)
+                }}
+            >
+                {generando && (
+                    <form onSubmit={confirmarGenerar} className="space-y-4">
+                        <p className="text-sm">
+                            {generando.nombre}
+                            <span
+                                className="block text-xs"
+                                style={{
+                                    color: "var(--color-muted-foreground)",
+                                }}
+                            >
+                                Período{" "}
+                                {generando.proxima_fecha
+                                    ? fechaCorta(generando.proxima_fecha)
+                                    : ""}
+                            </span>
+                        </p>
+
+                        <MontoInput
+                            id="monto-generar"
+                            label={`Monto de este período (${generando.moneda})`}
+                            moneda={generando.moneda}
+                            value={montoGenerar}
+                            onChange={setMontoGenerar}
+                            required
+                        />
+
+                        <p
+                            className="text-xs"
+                            style={{ color: "var(--color-muted-foreground)" }}
+                        >
+                            Si cambiás el monto, solo vale para este período.
+                            El monto base del recurrente no cambia.
+                        </p>
+
+                        {errorModal && (
+                            <Mensaje tipo="error">{errorModal}</Mensaje>
+                        )}
+
+                        <div className="flex gap-2 pt-1">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="flex-1"
+                                onClick={function () {
+                                    setGenerando(null)
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+
+                            <Button type="submit" className="flex-1">
+                                Generar
+                            </Button>
+                        </div>
+                    </form>
                 )}
-            </section>
-        </main>
+            </Modal>
+        </div>
     )
 }

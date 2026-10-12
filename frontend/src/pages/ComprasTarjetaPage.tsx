@@ -6,6 +6,9 @@ import {
     eliminarCompra,
     listarCuotas,
 } from "../services/compraTarjetaService"
+import { listarPagosPorCuota, anularPago } from "../services/pagoService"
+import { omitirCuota } from "../services/cuotaService"
+import { listarCuentas } from "../services/cuentaService"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 import Modal from "../components/ui/Modal"
@@ -15,6 +18,16 @@ import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import { formatearMonto } from "../lib/moneda"
+import CuotaFila from "./CuotaFila"
+import PagoCuotaModal from "./PagoCuotaModal"
+import AjustesCuotaModal from "./AjustesCuotaModal"
+import {
+    type Cuenta,
+    type Cuota,
+    type Pago,
+    fechaCorta,
+    puedePagarCuota,
+} from "./utilTarjetas"
 
 type Tarjeta = {
     id: number
@@ -33,17 +46,6 @@ type Compra = {
     descripcion: string | null
 }
 
-type Cuota = {
-    id: number
-    compra_tarjeta_id: number
-    numero: number
-    monto_base: number
-    periodo: string
-    fecha_vencimiento: string | null
-    estado: string
-    monto_pendiente: number
-}
-
 type Formulario = {
     tarjetaId: string
     monto: string
@@ -51,44 +53,13 @@ type Formulario = {
     descripcion: string
 }
 
+type Aviso = { tipo: "error" | "exito"; texto: string } | null
+
 type ComprasTarjetaPageProps = {
     // todas las tarjetas (también las dadas de baja, para saber su moneda)
     tarjetas: Tarjeta[]
-}
-
-const ETIQUETA_ESTADO: Record<string, string> = {
-    PENDIENTE: "Pendiente",
-    PARCIAL: "Pago parcial",
-    PAGADA: "Pagada",
-    OMITIDA: "Omitida",
-    ANULADA: "Anulada",
-}
-
-function colorEstado(estado: string) {
-    if (estado === "PAGADA") {
-        return "var(--color-income)"
-    }
-
-    if (estado === "PENDIENTE" || estado === "PARCIAL") {
-        return "var(--color-expense)"
-    }
-
-    return "var(--color-muted-foreground)"
-}
-
-// "2026-11-10" => "10/11/2026"
-function fechaCorta(fecha: string | null) {
-    if (!fecha) {
-        return "—"
-    }
-
-    const f = fecha.slice(0, 10)
-    return `${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(0, 4)}`
-}
-
-// "2026-11-01" => "11/2026"
-function periodoCorto(periodo: string) {
-    return `${periodo.slice(5, 7)}/${periodo.slice(0, 4)}`
+    // se llama cuando cambia la deuda de las tarjetas (compra, pago, ajuste...)
+    onCambio?: () => void
 }
 
 const formularioInicial: Formulario = {
@@ -100,8 +71,10 @@ const formularioInicial: Formulario = {
 
 export default function ComprasTarjetaPage({
     tarjetas,
+    onCambio,
 }: ComprasTarjetaPageProps) {
     const [compras, setCompras] = useState<Compra[]>([])
+    const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
@@ -115,10 +88,19 @@ export default function ComprasTarjetaPage({
     const [compraEditando, setCompraEditando] = useState<Compra | null>(null)
     const [descripcionEdicion, setDescripcionEdicion] = useState("")
 
-    // cuotas de la compra abierta
+    // cuotas de la compra abierta, con sus pagos
     const [compraAbierta, setCompraAbierta] = useState<number | null>(null)
     const [cuotas, setCuotas] = useState<Cuota[]>([])
+    const [pagosPorCuota, setPagosPorCuota] = useState<Record<number, Pago[]>>(
+        {}
+    )
     const [cargandoCuotas, setCargandoCuotas] = useState(false)
+    const [aviso, setAviso] = useState<Aviso>(null)
+
+    // modales de pago y de ajustes
+    const [cuotaPagando, setCuotaPagando] = useState<Cuota | null>(null)
+    const [pagoEditando, setPagoEditando] = useState<Pago | null>(null)
+    const [cuotaAjustes, setCuotaAjustes] = useState<Cuota | null>(null)
 
     // ---------- Carga de datos ----------
 
@@ -136,24 +118,73 @@ export default function ComprasTarjetaPage({
         }
     }
 
-    async function cargarCuotas(compraId: number) {
-        setCargandoCuotas(true)
-
+    async function cargarCuentas() {
         try {
-            setCuotas(await listarCuotas(compraId))
+            setCuentas(await listarCuentas())
         } catch (e) {
             setError(
                 e instanceof Error
                     ? e.message
-                    : "No se pudieron cargar las cuotas"
+                    : "No se pudieron cargar las cuentas"
             )
+        }
+    }
+
+    async function cargarCuotas(compraId: number) {
+        setCargandoCuotas(true)
+
+        try {
+            const datos: Cuota[] = await listarCuotas(compraId)
+            setCuotas(datos)
+
+            // los pagos de cada cuota
+            const pares = await Promise.all(
+                datos.map(async function (cuota) {
+                    try {
+                        const pagos: Pago[] = await listarPagosPorCuota(
+                            cuota.id
+                        )
+                        return [cuota.id, pagos] as const
+                    } catch {
+                        return [cuota.id, [] as Pago[]] as const
+                    }
+                })
+            )
+
+            const mapa: Record<number, Pago[]> = {}
+
+            for (const [id, pagos] of pares) {
+                mapa[id] = pagos
+            }
+
+            setPagosPorCuota(mapa)
+        } catch (e) {
+            setAviso({
+                tipo: "error",
+                texto:
+                    e instanceof Error
+                        ? e.message
+                        : "No se pudieron cargar las cuotas",
+            })
         } finally {
             setCargandoCuotas(false)
         }
     }
 
+    // se llama después de pagar, anular, ajustar u omitir
+    async function refrescar() {
+        await cargarCuentas()
+
+        if (compraAbierta !== null) {
+            await cargarCuotas(compraAbierta)
+        }
+
+        onCambio?.()
+    }
+
     useEffect(function () {
         cargar()
+        cargarCuentas()
     }, [])
 
     // ---------- Datos calculados ----------
@@ -181,6 +212,15 @@ export default function ComprasTarjetaPage({
 
     const cuotaEstimada =
         montoForm > 0 && cantidadCuotas > 0 ? montoForm / cantidadCuotas : 0
+
+    // moneda de la compra que está abierta (la usan los modales)
+    const datosCompraAbierta = compras.find(function (c) {
+        return c.id === compraAbierta
+    })
+
+    const monedaAbierta = datosCompraAbierta
+        ? monedaDe(datosCompraAbierta.tarjeta_id)
+        : "PYG"
 
     // ---------- Nueva compra ----------
 
@@ -238,6 +278,7 @@ export default function ComprasTarjetaPage({
             setMensaje("Compra registrada")
             setModalNueva(false)
             await cargar()
+            onCambio?.()
         } catch (e) {
             // ej: "La compra supera el límite disponible. Disponible: ..."
             setErrorModal(
@@ -284,7 +325,7 @@ export default function ComprasTarjetaPage({
         }
     }
 
-    // ---------- Anular ----------
+    // ---------- Anular compra ----------
 
     async function anular(compra: Compra) {
         const confirmar = window.confirm(
@@ -305,9 +346,11 @@ export default function ComprasTarjetaPage({
             if (compraAbierta === compra.id) {
                 setCompraAbierta(null)
                 setCuotas([])
+                setPagosPorCuota({})
             }
 
             await cargar()
+            onCambio?.()
         } catch (e) {
             // ej: "No se puede anular la compra porque tiene pagos confirmados"
             setError(
@@ -319,15 +362,104 @@ export default function ComprasTarjetaPage({
     // ---------- Ver cuotas ----------
 
     async function alternarCuotas(compraId: number) {
+        setAviso(null)
+
         if (compraAbierta === compraId) {
             setCompraAbierta(null)
             setCuotas([])
+            setPagosPorCuota({})
             return
         }
 
         setCompraAbierta(compraId)
         setCuotas([])
+        setPagosPorCuota({})
         await cargarCuotas(compraId)
+    }
+
+    // ---------- Pagos ----------
+
+    function abrirPago(cuota: Cuota) {
+        setAviso(null)
+        setPagoEditando(null)
+        setCuotaPagando(cuota)
+    }
+
+    function abrirEdicionPago(cuota: Cuota, pago: Pago) {
+        setAviso(null)
+        setPagoEditando(pago)
+        setCuotaPagando(cuota)
+    }
+
+    function cerrarPago() {
+        setCuotaPagando(null)
+        setPagoEditando(null)
+    }
+
+    async function pagoGuardado() {
+        setAviso({
+            tipo: "exito",
+            texto: pagoEditando ? "Pago actualizado" : "Pago registrado",
+        })
+
+        await refrescar()
+    }
+
+    async function anularUnPago(pago: Pago) {
+        const confirmar = window.confirm(
+            "¿Anular este pago? El dinero vuelve a las cuentas."
+        )
+
+        if (!confirmar) {
+            return
+        }
+
+        setAviso(null)
+
+        try {
+            await anularPago(pago.id)
+            setAviso({ tipo: "exito", texto: "Pago anulado" })
+            await refrescar()
+        } catch (e) {
+            setAviso({
+                tipo: "error",
+                texto:
+                    e instanceof Error
+                        ? e.message
+                        : "No se pudo anular el pago",
+            })
+        }
+    }
+
+    // ---------- Omitir cuota ----------
+
+    async function omitir(cuota: Cuota) {
+        const confirmar = window.confirm(
+            `¿Omitir la cuota ${cuota.numero}? Su saldo pasa a la cuota siguiente.`
+        )
+
+        if (!confirmar) {
+            return
+        }
+
+        setAviso(null)
+
+        try {
+            await omitirCuota(cuota.id)
+            setAviso({
+                tipo: "exito",
+                texto: `Cuota ${cuota.numero} omitida. El saldo pasó a la siguiente.`,
+            })
+            await refrescar()
+        } catch (e) {
+            setAviso({
+                tipo: "error",
+                texto:
+                    e instanceof Error
+                        ? e.message
+                        : "No se pudo omitir la cuota",
+            })
+        }
     }
 
     // ---------- Pantalla ----------
@@ -447,13 +579,19 @@ export default function ComprasTarjetaPage({
 
                             {abierta && (
                                 <div
-                                    className="pt-3"
+                                    className="pt-3 space-y-2"
                                     style={{
                                         borderTop:
                                             "1px solid var(--color-border)",
                                     }}
                                 >
-                                    {cargandoCuotas && (
+                                    {aviso && (
+                                        <Mensaje tipo={aviso.tipo}>
+                                            {aviso.texto}
+                                        </Mensaje>
+                                    )}
+
+                                    {cargandoCuotas && cuotas.length === 0 && (
                                         <Cargando texto="Cargando cuotas..." />
                                     )}
 
@@ -461,80 +599,42 @@ export default function ComprasTarjetaPage({
                                         <EstadoVacio texto="Sin cuotas." />
                                     )}
 
-                                    {cuotas.map(function (cuota) {
+                                    {cuotas.map(function (cuota, indice) {
+                                        const siguiente = cuotas[indice + 1]
+
+                                        const tieneSiguiente =
+                                            siguiente !== undefined &&
+                                            (siguiente.estado === "PENDIENTE" ||
+                                                siguiente.estado === "PARCIAL")
+
                                         return (
-                                            <div
+                                            <CuotaFila
                                                 key={cuota.id}
-                                                className="flex flex-wrap items-center justify-between gap-3 py-2.5"
-                                                style={{
-                                                    borderBottom:
-                                                        "1px solid var(--color-border)",
+                                                cuota={cuota}
+                                                moneda={moneda}
+                                                pagos={
+                                                    pagosPorCuota[cuota.id] ?? []
+                                                }
+                                                puedePagar={puedePagarCuota(
+                                                    cuotas,
+                                                    cuota
+                                                )}
+                                                tieneSiguiente={tieneSiguiente}
+                                                onPagar={function () {
+                                                    abrirPago(cuota)
                                                 }}
-                                            >
-                                                <div className="min-w-0">
-                                                    <p className="text-sm">
-                                                        Cuota {cuota.numero}
-                                                        <span
-                                                            className="ml-2 text-xs"
-                                                            style={{
-                                                                color: colorEstado(
-                                                                    cuota.estado
-                                                                ),
-                                                            }}
-                                                        >
-                                                            {ETIQUETA_ESTADO[
-                                                                cuota.estado
-                                                            ] ?? cuota.estado}
-                                                        </span>
-                                                    </p>
-
-                                                    <p
-                                                        className="text-xs"
-                                                        style={{
-                                                            color: "var(--color-muted-foreground)",
-                                                        }}
-                                                    >
-                                                        Período{" "}
-                                                        {periodoCorto(
-                                                            cuota.periodo
-                                                        )}{" "}
-                                                        · Vence{" "}
-                                                        {fechaCorta(
-                                                            cuota.fecha_vencimiento
-                                                        )}
-                                                    </p>
-                                                </div>
-
-                                                <div className="text-right">
-                                                    <p
-                                                        className="text-sm"
-                                                        style={{
-                                                            fontFamily:
-                                                                "var(--font-mono)",
-                                                        }}
-                                                    >
-                                                        {formatearMonto(
-                                                            cuota.monto_base,
-                                                            moneda
-                                                        )}
-                                                    </p>
-
-                                                    <p
-                                                        className="text-xs"
-                                                        style={{
-                                                            fontFamily:
-                                                                "var(--font-mono)",
-                                                            color: "var(--color-muted-foreground)",
-                                                        }}
-                                                    >
-                                                        Pendiente{" "}
-                                                        {formatearMonto(
-                                                            cuota.monto_pendiente,
-                                                            moneda
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                                onEditarPago={function (pago) {
+                                                    abrirEdicionPago(cuota, pago)
+                                                }}
+                                                onAnularPago={anularUnPago}
+                                                onAjustes={function () {
+                                                    setAviso(null)
+                                                    setCuotaAjustes(cuota)
+                                                }}
+                                                onOmitir={function () {
+                                                    omitir(cuota)
+                                                }}
+                                            />
                                         )
                                     })}
                                 </div>
@@ -693,6 +793,26 @@ export default function ComprasTarjetaPage({
                     </div>
                 </form>
             </Modal>
+
+            {/* Modal: pagar o editar un pago */}
+            <PagoCuotaModal
+                cuota={cuotaPagando}
+                moneda={monedaAbierta}
+                pago={pagoEditando}
+                cuentas={cuentas}
+                onClose={cerrarPago}
+                onGuardado={pagoGuardado}
+            />
+
+            {/* Modal: ajustes de una cuota */}
+            <AjustesCuotaModal
+                cuota={cuotaAjustes}
+                moneda={monedaAbierta}
+                onClose={function () {
+                    setCuotaAjustes(null)
+                }}
+                onCambio={refrescar}
+            />
         </div>
     )
 }
