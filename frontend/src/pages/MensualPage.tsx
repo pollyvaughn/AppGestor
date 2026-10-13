@@ -51,6 +51,10 @@ type FiltroCategoria = {
 
 type Cuenta = { id: number; nombre: string; tipo: string; moneda: string }
 
+type MensualPageProps = {
+    onIrATarjetas: () => void
+}
+
 type Formulario = {
     tipo: Tipo
     categoriaId: string
@@ -122,7 +126,7 @@ function formularioVacio(): Formulario {
     }
 }
 
-export default function MensualPage() {
+export default function MensualPage({ onIrATarjetas }: MensualPageProps) {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
@@ -958,6 +962,9 @@ export default function MensualPage() {
                                               : ""
 
                                     const etiquetaTipo = ETIQUETA_TIPO[m.tipo]
+                                    const metodoPago = cuentas.find(function (cuenta) {
+                                        return cuenta.id === m.metodo_pago_id
+                                    })
                                     const color = esContable(m)
                                         ? colorDe(m)
                                         : COLOR_POR_DEFECTO
@@ -1014,7 +1021,9 @@ export default function MensualPage() {
                                                                     fontSize: "11px",
                                                                 }}
                                                             >
-                                                                {m.metodo_pago}
+                                                                {metodoPago?.tipo === "TARJETA_CREDITO"
+                                                                    ? `Tarjeta de crédito · ${m.metodo_pago}`
+                                                                    : m.metodo_pago}
                                                             </span>
                                                         )}
                                                     </p>
@@ -1128,6 +1137,32 @@ export default function MensualPage() {
                             )
                         })}
                     </Select>
+
+                    <div
+                        className="flex flex-wrap items-center justify-between gap-2 p-3"
+                        style={{
+                            background: "var(--color-muted)",
+                            borderRadius: "var(--radius-sm)",
+                        }}
+                    >
+                        <p
+                            className="text-xs flex-1"
+                            style={{ color: "var(--color-muted-foreground)" }}
+                        >
+                            Las compras con tarjeta se registran en la pestaña Tarjetas, donde se crean sus cuotas.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={function () {
+                                setModalAbierto(false)
+                                onIrATarjetas()
+                            }}
+                            className="text-xs underline min-h-11 md:min-h-0"
+                            style={{ color: "var(--color-foreground)" }}
+                        >
+                            Ir a Tarjetas
+                        </button>
+                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {!cuentaElegida && (

@@ -62,7 +62,13 @@ export default function App() {
             onCerrarSesion={cerrarSesion}
         >
             {vista === "global" && <GlobalPage />}
-            {vista === "mensual" && <MensualPage />}
+            {vista === "mensual" && (
+                <MensualPage
+                    onIrATarjetas={function () {
+                        setVista("tarjetas")
+                    }}
+                />
+            )}
             {vista === "tarjetas" && <TarjetasYComprasPage />}
             {vista === "recurrentes" && <RecurrentesPage />}
             {vista === "categorias" && <CategoriasPage />}
