@@ -257,6 +257,21 @@ export default function PagoCuotaModal({
                         {formatearMonto(cuota.monto_pendiente, moneda)} {moneda}
                     </p>
 
+                    <p
+                        className="text-xs p-3"
+                        style={{
+                            color: "var(--color-muted-foreground)",
+                            background: "var(--color-muted)",
+                            borderRadius: "var(--radius-sm)",
+                        }}
+                    >
+                        Esta cuota corresponde a una compra hecha con tarjeta.
+                        Al guardar el pago, el monto se descuenta ahora del saldo
+                        de la cuenta elegida y reduce lo pendiente de la cuota.
+                        Elegí desde dónde sale el dinero, no la tarjeta que estás
+                        pagando.
+                    </p>
+
                     <MontoInput
                         id="monto-pago"
                         label={`Monto a pagar (${moneda})`}
@@ -268,7 +283,7 @@ export default function PagoCuotaModal({
 
                     <Select
                         id="cuenta1"
-                        label="Pagar con"
+                        label="Cuenta desde la que sale el dinero"
                         value={cuenta1}
                         onChange={function (e) {
                             setCuenta1(e.target.value)
@@ -298,7 +313,7 @@ export default function PagoCuotaModal({
                                 }
                             }}
                         />
-                        Dividir entre dos cuentas
+                        Dividir el pago entre dos cuentas
                     </label>
 
                     {dividir && (
