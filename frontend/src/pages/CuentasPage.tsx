@@ -69,8 +69,12 @@ export default function CuentasPage() {
 
     async function cargar() {
         try {
-            const datos = await listarCuentas()
-            setCuentas(datos)
+            const datos: Cuenta[] = await listarCuentas()
+            setCuentas(
+                datos.filter(function (cuenta) {
+                    return cuenta.tipo !== "TARJETA_CREDITO"
+                })
+            )
         } catch (e) {
             setError(
                 e instanceof Error
@@ -179,7 +183,7 @@ export default function CuentasPage() {
             {cargando && <Cargando />}
 
             {!cargando && cuentas.length === 0 && (
-                <EstadoVacio texto="No tenés cuentas." />
+                <EstadoVacio texto="No tenés cuentas. Las tarjetas se administran en la pestaña Tarjetas." />
             )}
 
             <div
@@ -189,7 +193,6 @@ export default function CuentasPage() {
                 }}
             >
                 {cuentas.map(function (cuenta) {
-                    const esTarjeta = cuenta.tipo === "TARJETA_CREDITO"
                     const saldo = Number(cuenta.saldo)
 
                     return (
@@ -217,60 +220,47 @@ export default function CuentasPage() {
                                 </p>
                             </div>
 
-                            {esTarjeta ? (
-                                <p
-                                    className="text-xs"
-                                    style={{
-                                        color: "var(--color-muted-foreground)",
+                            <p
+                                className="text-2xl font-light"
+                                style={{
+                                    fontFamily: "var(--font-mono)",
+                                    color:
+                                        saldo >= 0
+                                            ? "var(--color-income)"
+                                            : "var(--color-expense)",
+                                }}
+                            >
+                                {formatearMonto(saldo, cuenta.moneda)}{" "}
+                                <span className="text-sm">
+                                    {cuenta.moneda}
+                                </span>
+                            </p>
+
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    aria-label={`Editar ${cuenta.nombre}`}
+                                    className="!py-1 !text-xs"
+                                    onClick={function () {
+                                        abrirEdicion(cuenta)
                                     }}
                                 >
-                                    Se administra en la pestaña Tarjetas.
-                                </p>
-                            ) : (
-                                <>
-                                    <p
-                                        className="text-2xl font-light"
-                                        style={{
-                                            fontFamily: "var(--font-mono)",
-                                            color:
-                                                saldo >= 0
-                                                    ? "var(--color-income)"
-                                                    : "var(--color-expense)",
-                                        }}
-                                    >
-                                        {formatearMonto(saldo, cuenta.moneda)}{" "}
-                                        <span className="text-sm">
-                                            {cuenta.moneda}
-                                        </span>
-                                    </p>
+                                    Editar
+                                </Button>
 
-                                    <div className="flex gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            aria-label={`Editar ${cuenta.nombre}`}
-                                            className="!py-1 !text-xs"
-                                            onClick={function () {
-                                                abrirEdicion(cuenta)
-                                            }}
-                                        >
-                                            Editar
-                                        </Button>
-
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            aria-label={`Eliminar ${cuenta.nombre}`}
-                                            className="!py-1 !text-xs"
-                                            onClick={function () {
-                                                eliminar(cuenta)
-                                            }}
-                                        >
-                                            Desactivar
-                                        </Button>
-                                    </div>
-                                </>
-                            )}
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    aria-label={`Eliminar ${cuenta.nombre}`}
+                                    className="!py-1 !text-xs"
+                                    onClick={function () {
+                                        eliminar(cuenta)
+                                    }}
+                                >
+                                    Desactivar
+                                </Button>
+                            </div>
                         </div>
                     )
                 })}
