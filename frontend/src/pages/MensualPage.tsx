@@ -36,6 +36,19 @@ type Categoria = {
     color: string | null
 }
 
+type CategoriaResumen = {
+    id: number | null
+    nombre: string
+    total: number
+    color: string
+}
+
+type FiltroCategoria = {
+    tipo: Tipo
+    categoriaId: number | null
+    nombre: string
+}
+
 type Cuenta = { id: number; nombre: string; tipo: string; moneda: string }
 
 type Formulario = {
@@ -116,7 +129,12 @@ export default function MensualPage() {
     const [mes, setMes] = useState(mesActual())
     const [monedaElegida, setMonedaElegida] = useState("")
     const [filtro, setFiltro] = useState<Filtro>("TODOS")
-    const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
+    const [categoriaFiltro, setCategoriaFiltro] =
+        useState<FiltroCategoria | null>(null)
+    const [categoriasExpandidas, setCategoriasExpandidas] = useState({
+        INGRESO: false,
+        EGRESO: false,
+    })
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
@@ -348,8 +366,8 @@ export default function MensualPage() {
     let egresos = 0
     let cantidadIngresos = 0
     let cantidadEgresos = 0
-    const porCategoria: Record<string, number> = {}
-    const colorCategoria: Record<string, string> = {}
+    const porCategoriaIngreso: Record<string, CategoriaResumen> = {}
+    const porCategoriaEgreso: Record<string, CategoriaResumen> = {}
 
     for (const m of contables) {
         const monto = Number(m.monto)
@@ -357,13 +375,29 @@ export default function MensualPage() {
         if (m.tipo === "INGRESO") {
             ingresos += monto
             cantidadIngresos += 1
+
+            const key = `INGRESO:${m.categoria_id ?? "sin-categoria"}`
+            const categoria = porCategoriaIngreso[key] ?? {
+                id: m.categoria_id,
+                nombre: m.categoria ?? SIN_CATEGORIA,
+                total: 0,
+                color: m.categoria ? colorDe(m) : COLOR_POR_DEFECTO,
+            }
+            categoria.total += monto
+            porCategoriaIngreso[key] = categoria
         } else {
             egresos += monto
             cantidadEgresos += 1
 
-            const nombre = m.categoria ?? SIN_CATEGORIA
-            porCategoria[nombre] = (porCategoria[nombre] ?? 0) + monto
-            colorCategoria[nombre] = m.categoria ? colorDe(m) : COLOR_POR_DEFECTO
+            const key = `EGRESO:${m.categoria_id ?? "sin-categoria"}`
+            const categoria = porCategoriaEgreso[key] ?? {
+                id: m.categoria_id,
+                nombre: m.categoria ?? SIN_CATEGORIA,
+                total: 0,
+                color: m.categoria ? colorDe(m) : COLOR_POR_DEFECTO,
+            }
+            categoria.total += monto
+            porCategoriaEgreso[key] = categoria
         }
     }
 
@@ -375,11 +409,16 @@ export default function MensualPage() {
     const anchoBarra =
         tasaAhorro === null ? 0 : Math.min(Math.max(tasaAhorro, 0), 100)
 
-    const categoriasGasto = Object.entries(porCategoria).sort(function (a, b) {
-        return b[1] - a[1]
+    const categoriasIngreso = Object.values(porCategoriaIngreso).sort(function (a, b) {
+        return b.total - a.total
     })
-    const maximoCategoria =
-        categoriasGasto.length > 0 ? categoriasGasto[0][1] : 1
+    const categoriasGasto = Object.values(porCategoriaEgreso).sort(function (a, b) {
+        return b.total - a.total
+    })
+    const maximoCategoriaIngreso =
+        categoriasIngreso.length > 0 ? categoriasIngreso[0].total : 1
+    const maximoCategoriaGasto =
+        categoriasGasto.length > 0 ? categoriasGasto[0].total : 1
 
     const visibles = delMesMoneda.filter(function (m) {
         if (filtro !== "TODOS" && m.tipo !== filtro) {
@@ -388,7 +427,8 @@ export default function MensualPage() {
 
         if (
             categoriaFiltro !== null &&
-            (m.categoria ?? SIN_CATEGORIA) !== categoriaFiltro
+            (m.tipo !== categoriaFiltro.tipo ||
+                m.categoria_id !== categoriaFiltro.categoriaId)
         ) {
             return false
         }
@@ -414,15 +454,21 @@ export default function MensualPage() {
         [mes, moneda]
     )
 
-    function elegirCategoria(nombre: string) {
-        if (categoriaFiltro === nombre) {
+    function elegirCategoria(tipo: Tipo, categoria: CategoriaResumen) {
+        if (
+            categoriaFiltro?.tipo === tipo &&
+            categoriaFiltro.categoriaId === categoria.id
+        ) {
             setCategoriaFiltro(null)
             return
         }
 
-        // las categorías de esta lista son de gastos
-        setCategoriaFiltro(nombre)
-        setFiltro("EGRESO")
+        setCategoriaFiltro({
+            tipo,
+            categoriaId: categoria.id,
+            nombre: categoria.nombre,
+        })
+        setFiltro(tipo)
     }
 
     // ---------- Pantalla ----------
@@ -701,87 +747,139 @@ export default function MensualPage() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                        {/* Gastos por categoría */}
-                        <section
-                            className="lg:col-span-2 p-4 sm:p-6 self-start"
-                            style={estiloCard}
-                        >
-                            <h2 className="text-xs mb-1" style={estiloTitulo}>
-                                Gastos por categoría
-                            </h2>
-                            <p
-                                className="text-xs mb-4"
-                                style={{ color: "var(--color-muted-foreground)" }}
-                            >
-                                Tocá una categoría para ver solo sus movimientos.
-                            </p>
+                        <div className="lg:col-span-2 space-y-6 self-start">
+                            {[
+                                {
+                                    tipo: "INGRESO" as const,
+                                    titulo: "Ingresos por categoría",
+                                    vacio: "Sin ingresos este mes.",
+                                    categorias: categoriasIngreso,
+                                    maximo: maximoCategoriaIngreso,
+                                },
+                                {
+                                    tipo: "EGRESO" as const,
+                                    titulo: "Gastos por categoría",
+                                    vacio: "Sin gastos este mes.",
+                                    categorias: categoriasGasto,
+                                    maximo: maximoCategoriaGasto,
+                                },
+                            ].map(function (grupo) {
+                                const expandida = categoriasExpandidas[grupo.tipo]
+                                const visibles = expandida
+                                    ? grupo.categorias
+                                    : grupo.categorias.slice(0, 5)
 
-                            {categoriasGasto.length === 0 && (
-                                <EstadoVacio texto="Sin gastos este mes." />
-                            )}
+                                return (
+                                    <section
+                                        key={grupo.tipo}
+                                        className="p-4 sm:p-6"
+                                        style={estiloCard}
+                                    >
+                                        <h2 className="text-xs mb-1" style={estiloTitulo}>
+                                            {grupo.titulo}
+                                        </h2>
+                                        <p
+                                            className="text-xs mb-4"
+                                            style={{ color: "var(--color-muted-foreground)" }}
+                                        >
+                                            Tocá una categoría para ver solo sus movimientos.
+                                        </p>
 
-                            <ul className="space-y-1">
-                                {categoriasGasto.map(function ([nombre, total]) {
-                                    const activa = categoriaFiltro === nombre
-                                    const color = colorCategoria[nombre]
+                                        {grupo.categorias.length === 0 && (
+                                            <EstadoVacio texto={grupo.vacio} />
+                                        )}
 
-                                    return (
-                                        <li key={nombre}>
+                                        <ul
+                                            id={`categorias-${grupo.tipo.toLowerCase()}-mensual`}
+                                            className="space-y-1"
+                                        >
+                                            {visibles.map(function (categoria) {
+                                                const activa =
+                                                    categoriaFiltro?.tipo === grupo.tipo &&
+                                                    categoriaFiltro.categoriaId === categoria.id
+
+                                                return (
+                                                    <li
+                                                        key={`${grupo.tipo}:${categoria.id ?? "sin-categoria"}`}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            aria-pressed={activa}
+                                                            onClick={function () {
+                                                                elegirCategoria(grupo.tipo, categoria)
+                                                            }}
+                                                            className="w-full text-left p-2 min-h-11 md:min-h-0 space-y-1.5"
+                                                            style={{
+                                                                borderRadius: "var(--radius-sm)",
+                                                                background: activa
+                                                                    ? "var(--color-muted)"
+                                                                    : "transparent",
+                                                            }}
+                                                        >
+                                                            <span className="flex items-center justify-between gap-3">
+                                                                <span className="flex items-center gap-2 min-w-0">
+                                                                    <span
+                                                                        className="w-3 h-3 rounded-full shrink-0"
+                                                                        style={{ background: categoria.color }}
+                                                                        aria-hidden="true"
+                                                                    />
+                                                                    <span
+                                                                        className="text-sm truncate"
+                                                                        style={{ fontWeight: activa ? 600 : 400 }}
+                                                                    >
+                                                                        {categoria.nombre}
+                                                                    </span>
+                                                                </span>
+                                                                <span
+                                                                    className="text-xs shrink-0"
+                                                                    style={{ fontFamily: "var(--font-mono)" }}
+                                                                >
+                                                                    {formatearMonto(categoria.total, moneda)} {moneda}
+                                                                </span>
+                                                            </span>
+
+                                                            <span
+                                                                className="block h-1.5 w-full rounded-full"
+                                                                style={{ background: "var(--color-muted)" }}
+                                                                aria-hidden="true"
+                                                            >
+                                                                <span
+                                                                    className="block h-full rounded-full"
+                                                                    style={{
+                                                                        width: `${(categoria.total / grupo.maximo) * 100}%`,
+                                                                        background: categoria.color,
+                                                                    }}
+                                                                />
+                                                            </span>
+                                                        </button>
+                                                    </li>
+                                                )
+                                            })}
+                                        </ul>
+
+                                        {grupo.categorias.length > 5 && (
                                             <button
                                                 type="button"
-                                                aria-pressed={activa}
+                                                aria-expanded={expandida}
+                                                aria-controls={`categorias-${grupo.tipo.toLowerCase()}-mensual`}
                                                 onClick={function () {
-                                                    elegirCategoria(nombre)
+                                                    setCategoriasExpandidas({
+                                                        ...categoriasExpandidas,
+                                                        [grupo.tipo]: !expandida,
+                                                    })
                                                 }}
-                                                className="w-full text-left p-2 min-h-11 md:min-h-0 space-y-1.5"
-                                                style={{
-                                                    borderRadius: "var(--radius-sm)",
-                                                    background: activa
-                                                        ? "var(--color-muted)"
-                                                        : "transparent",
-                                                }}
+                                                className="mt-3 text-xs underline min-h-11 md:min-h-0"
+                                                style={{ color: "var(--color-muted-foreground)" }}
                                             >
-                                                <span className="flex items-center justify-between gap-3">
-                                                    <span className="flex items-center gap-2 min-w-0">
-                                                        <span
-                                                            className="w-3 h-3 rounded-full shrink-0"
-                                                            style={{ background: color }}
-                                                            aria-hidden="true"
-                                                        />
-                                                        <span
-                                                            className="text-sm truncate"
-                                                            style={{ fontWeight: activa ? 600 : 400 }}
-                                                        >
-                                                            {nombre}
-                                                        </span>
-                                                    </span>
-                                                    <span
-                                                        className="text-xs shrink-0"
-                                                        style={{ fontFamily: "var(--font-mono)" }}
-                                                    >
-                                                        {formatearMonto(total, moneda)} {moneda}
-                                                    </span>
-                                                </span>
-
-                                                <span
-                                                    className="block h-1.5 w-full rounded-full"
-                                                    style={{ background: "var(--color-muted)" }}
-                                                    aria-hidden="true"
-                                                >
-                                                    <span
-                                                        className="block h-full rounded-full"
-                                                        style={{
-                                                            width: `${(total / maximoCategoria) * 100}%`,
-                                                            background: color,
-                                                        }}
-                                                    />
-                                                </span>
+                                                {expandida
+                                                    ? "Ver menos"
+                                                    : `Ver más (+${grupo.categorias.length - 5})`}
                                             </button>
-                                        </li>
-                                    )
-                                })}
-                            </ul>
-                        </section>
+                                        )}
+                                    </section>
+                                )
+                            })}
+                        </div>
 
                         {/* Movimientos */}
                         <section
@@ -827,7 +925,11 @@ export default function MensualPage() {
                                     }}
                                 >
                                     <span className="text-xs">
-                                        Categoría: <strong>{categoriaFiltro}</strong>
+                                        Categoría de{" "}
+                                        <strong>
+                                            {categoriaFiltro.tipo === "INGRESO" ? "ingreso" : "egreso"}:{" "}
+                                            {categoriaFiltro.nombre}
+                                        </strong>
                                     </span>
                                     <button
                                         type="button"
