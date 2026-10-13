@@ -68,11 +68,24 @@ database/schema.sql
 
 Esto crea la base de datos y sus tablas.
 
-Los datos de prueba, si se agregan posteriormente, estarán en:
+Los datos de prueba están en:
 
 ```text
 database/seed.sql
 ```
+
+Para cargar la demo, ejecutar `database/seed.sql` después del esquema, desde
+phpMyAdmin o con el cliente de MySQL. El seed no borra datos existentes y se
+puede ejecutar más de una vez.
+
+Acceso de demostración:
+
+```text
+Email: demo@appgestor.local
+Contraseña: Demo123!
+```
+
+Si ya existía un usuario con ese email, el seed conserva su contraseña actual.
 
 ---
 
