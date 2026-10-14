@@ -244,7 +244,12 @@ INTERVALOS = {
 }
 
 
-def generar_movimiento(recurrente_id, usuario_id, monto=None):
+def generar_movimiento(
+    recurrente_id,
+    usuario_id,
+    monto=None,
+    metodo_pago_id=None
+):
     conexion = get_connection()
 
     try:
@@ -289,16 +294,45 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
             return None, "La categoría del recurrente está inactiva"
 
         if (
-            recurrente["metodo_pago_id"] is not None
+            metodo_pago_id is None
+            and recurrente["metodo_pago_id"] is not None
             and recurrente["metodo_estado"] != "ACTIVO"
         ):
             return None, "El método de pago del recurrente está inactivo"
 
         if (
-            recurrente["metodo_pago_id"] is not None
+            metodo_pago_id is None
+            and recurrente["metodo_pago_id"] is not None
             and recurrente["metodo_moneda"] != recurrente["moneda"]
         ):
             return None, "La moneda del recurrente no coincide con la del método de pago"
+
+        metodo_pago_id_final = (
+            metodo_pago_id
+            if metodo_pago_id is not None
+            else recurrente["metodo_pago_id"]
+        )
+        metodo_tipo = recurrente["metodo_tipo"]
+
+        if metodo_pago_id is not None:
+            cursor.execute(
+                """
+                SELECT tipo, moneda, estado
+                FROM metodo_pago
+                WHERE id = %s
+                AND usuario_id = %s
+                """,
+                (metodo_pago_id_final, usuario_id)
+            )
+            metodo = cursor.fetchone()
+
+            if not metodo or metodo["estado"] != "ACTIVO":
+                return None, "Método de pago no encontrado o inactivo"
+
+            if metodo["moneda"] != recurrente["moneda"]:
+                return None, "La moneda del recurrente no coincide con la del método de pago"
+
+            metodo_tipo = metodo["tipo"]
 
         periodo = recurrente["proxima_fecha"]
 
@@ -329,7 +363,7 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
         movimiento_id = None
 
         # Recurrente con tarjeta de crédito
-        if recurrente["metodo_tipo"] == "TARJETA_CREDITO":
+        if metodo_tipo == "TARJETA_CREDITO":
 
             if recurrente["tipo"] != "EGRESO":
                 return None, "Una tarjeta de crédito solo puede usarse para recurrentes de tipo EGRESO"
@@ -341,7 +375,7 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
                 WHERE metodo_pago_id = %s
                 AND estado = 'ACTIVA'
                 """,
-                (recurrente["metodo_pago_id"],)
+                (metodo_pago_id_final,)
             )
 
             tarjeta = cursor.fetchone()
@@ -381,7 +415,7 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
                 (
                     usuario_id,
                     recurrente["categoria_id"],
-                    recurrente["metodo_pago_id"],
+                    metodo_pago_id_final,
                     recurrente["tipo"],
                     recurrente["nombre"],
                     monto_final,
@@ -392,10 +426,10 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
 
             movimiento_id = cursor.lastrowid
 
-            if recurrente["metodo_pago_id"] is not None:
+            if metodo_pago_id_final is not None:
                 actualizar_saldo(
                     cursor,
-                    recurrente["metodo_pago_id"],
+                    metodo_pago_id_final,
                     monto_final,
                     recurrente["tipo"]
                 )

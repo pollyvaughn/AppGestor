@@ -17,10 +17,23 @@ export function eliminarRecurrente(id: number) {
 }
 
 // Si no se pasa monto, el backend usa el monto base.
-export function generarMovimiento(id: number, monto?: number) {
-    const parametros = monto !== undefined ? `?monto=${monto}` : ""
+export function generarMovimiento(
+    id: number,
+    monto?: number,
+    metodoPagoId?: number
+) {
+    const parametros = new URLSearchParams()
 
-    return api(`/recurrentes/${id}/generar${parametros}`, { method: "POST" })
+    if (monto !== undefined) {
+        parametros.set("monto", String(monto))
+    }
+    if (metodoPagoId !== undefined) {
+        parametros.set("metodo_pago_id", String(metodoPagoId))
+    }
+
+    const queryString = parametros.toString()
+    const query = queryString ? `?${queryString}` : ""
+    return api(`/recurrentes/${id}/generar${query}`, { method: "POST" })
 }
 
 // periodo con formato "2026-10-10". Por ahora no se usa en pantalla.

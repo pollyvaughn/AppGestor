@@ -99,12 +99,14 @@ def eliminar(
 def generar(
     recurrente_id: int,
     monto: float | None = Query(default=None, gt=0),
+    metodo_pago_id: int | None = Query(default=None, gt=0),
     usuario=Depends(obtener_usuario_actual)
 ):
     resultado, error = generar_movimiento(
         recurrente_id,
         usuario["id"],
-        monto
+        monto,
+        metodo_pago_id
     )
 
     if error:

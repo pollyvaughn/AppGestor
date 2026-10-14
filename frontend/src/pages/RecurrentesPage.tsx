@@ -134,6 +134,7 @@ export default function RecurrentesPage({
     // generar movimiento
     const [generando, setGenerando] = useState<Recurrente | null>(null)
     const [montoGenerar, setMontoGenerar] = useState("")
+    const [cuentaGenerar, setCuentaGenerar] = useState("")
 
     const [errorModal, setErrorModal] = useState("")
 
@@ -309,6 +310,9 @@ export default function RecurrentesPage({
     function abrirGenerar(r: Recurrente) {
         setGenerando(r)
         setMontoGenerar(String(Number(r.monto_base)))
+        setCuentaGenerar(
+            r.metodo_pago_id === null ? "" : String(r.metodo_pago_id)
+        )
         setErrorModal("")
     }
 
@@ -331,8 +335,9 @@ export default function RecurrentesPage({
         }
 
         // efectivo y billetera no pueden quedar en negativo (regla del backend)
+        const metodoPagoId = cuentaGenerar ? Number(cuentaGenerar) : undefined
         const cuenta = cuentas.find(function (c) {
-            return c.id === generando.metodo_pago_id
+            return c.id === metodoPagoId
         })
 
         if (
@@ -346,7 +351,11 @@ export default function RecurrentesPage({
         }
 
         try {
-            const resultado = await generarMovimiento(generando.id, monto)
+            const resultado = await generarMovimiento(
+                generando.id,
+                monto,
+                metodoPagoId
+            )
 
             setMensaje(
                 `Movimiento generado. Próxima fecha: ${fechaCorta(resultado.proxima_fecha)}`
@@ -377,6 +386,17 @@ export default function RecurrentesPage({
     })
 
     const cuentaElegida = formulario.cuentaId !== ""
+    const cuentasParaGenerar = generando
+        ? cuentas.filter(function (cuenta) {
+              return (
+                  cuenta.moneda === generando.moneda &&
+                  !(
+                      generando.tipo === "INGRESO" &&
+                      cuenta.tipo === "TARJETA_CREDITO"
+                  )
+              )
+          })
+        : []
 
     // ---------- Pantalla ----------
 
@@ -735,12 +755,32 @@ export default function RecurrentesPage({
                             required
                         />
 
+                        <Select
+                            id="cuenta-generar"
+                            label="Cuenta de este período"
+                            value={cuentaGenerar}
+                            onChange={function (e) {
+                                setCuentaGenerar(e.target.value)
+                            }}
+                        >
+                            {generando.metodo_pago_id === null && (
+                                <option value="">Sin cuenta</option>
+                            )}
+                            {cuentasParaGenerar.map(function (cuenta) {
+                                return (
+                                    <option key={cuenta.id} value={cuenta.id}>
+                                        {cuenta.nombre} ({cuenta.tipo})
+                                    </option>
+                                )
+                            })}
+                        </Select>
+
                         <p
                             className="text-xs"
                             style={{ color: "var(--color-muted-foreground)" }}
                         >
-                            Si cambiás el monto, solo vale para este período.
-                            El monto base del recurrente no cambia.
+                            La cuenta y el monto elegidos solo se aplican a
+                            este período; no cambian el recurrente.
                         </p>
 
                         {errorModal && (
