@@ -424,6 +424,8 @@ export default function MensualPage({
     const categoriasGasto = Object.values(porCategoriaEgreso).sort(function (a, b) {
         return b.total - a.total
     })
+    const mayorGasto = categoriasGasto[0]
+    const menorGasto = categoriasGasto[categoriasGasto.length - 1]
     const maximoCategoriaIngreso =
         categoriasIngreso.length > 0 ? categoriasIngreso[0].total : 1
     const maximoCategoriaGasto =
@@ -764,6 +766,7 @@ export default function MensualPage({
                                     vacio: "Sin ingresos este mes.",
                                     categorias: categoriasIngreso,
                                     maximo: maximoCategoriaIngreso,
+                                    total: ingresos,
                                 },
                                 {
                                     tipo: "EGRESO" as const,
@@ -771,6 +774,7 @@ export default function MensualPage({
                                     vacio: "Sin gastos este mes.",
                                     categorias: categoriasGasto,
                                     maximo: maximoCategoriaGasto,
+                                    total: egresos,
                                 },
                             ].map(function (grupo) {
                                 const expandida = categoriasExpandidas[grupo.tipo]
@@ -793,6 +797,74 @@ export default function MensualPage({
                                         >
                                             Tocá una categoría para ver solo sus movimientos.
                                         </p>
+
+                                        {grupo.tipo === "EGRESO" &&
+                                            categoriasGasto.length > 0 && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                                    {[
+                                                        {
+                                                            titulo: "Mayor gasto",
+                                                            categoria: mayorGasto,
+                                                        },
+                                                        ...(categoriasGasto.length > 1
+                                                            ? [
+                                                                  {
+                                                                      titulo: "Menor gasto",
+                                                                      categoria: menorGasto,
+                                                                  },
+                                                              ]
+                                                            : []),
+                                                    ].map(function (resumen) {
+                                                        const porcentaje =
+                                                            resumen.categoria && egresos > 0
+                                                                ? Math.round(
+                                                                      (resumen.categoria.total /
+                                                                          egresos) *
+                                                                          100
+                                                                  )
+                                                                : 0
+
+                                                        return (
+                                                            <div
+                                                                key={resumen.titulo}
+                                                                className="p-3 space-y-1"
+                                                                style={{
+                                                                    background:
+                                                                        "var(--color-muted)",
+                                                                    borderRadius:
+                                                                        "var(--radius-sm)",
+                                                                }}
+                                                            >
+                                                                <p
+                                                                    className="text-xs"
+                                                                    style={{
+                                                                        color: "var(--color-muted-foreground)",
+                                                                    }}
+                                                                >
+                                                                    {resumen.titulo}
+                                                                </p>
+                                                                <p className="text-sm font-medium truncate">
+                                                                    {resumen.categoria?.nombre}
+                                                                </p>
+                                                                <p
+                                                                    className="text-xs"
+                                                                    style={{
+                                                                        fontFamily:
+                                                                            "var(--font-mono)",
+                                                                    }}
+                                                                >
+                                                                    {resumen.categoria
+                                                                        ? `${formatearMonto(
+                                                                              resumen.categoria.total,
+                                                                              moneda
+                                                                          )} ${moneda} · ${porcentaje}% del gasto`
+                                                                        : ""}
+                                                                </p>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
 
                                         {grupo.categorias.length === 0 && (
                                             <EstadoVacio texto={grupo.vacio} />
@@ -855,7 +927,16 @@ export default function MensualPage({
                                                                 <span
                                                                     className="block h-full rounded-full"
                                                                     style={{
-                                                                        width: `${(categoria.total / grupo.maximo) * 100}%`,
+                                                                        width: `${
+                                                                            grupo.tipo === "EGRESO" &&
+                                                                            grupo.total > 0
+                                                                                ? (categoria.total /
+                                                                                      grupo.total) *
+                                                                                  100
+                                                                                : (categoria.total /
+                                                                                      grupo.maximo) *
+                                                                                  100
+                                                                        }%`,
                                                                         background: categoria.color,
                                                                     }}
                                                                 />
