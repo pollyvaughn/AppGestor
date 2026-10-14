@@ -9,6 +9,7 @@ import {
 import { listarPagosPorCuota, anularPago } from "../services/pagoService"
 import { omitirCuota } from "../services/cuotaService"
 import { listarCuentas } from "../services/cuentaService"
+import { listarCategorias } from "../services/categoriaService"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 import Modal from "../components/ui/Modal"
@@ -36,6 +37,12 @@ type Tarjeta = {
     estado: string
 }
 
+type Categoria = {
+    id: number
+    nombre: string
+    tipo: "INGRESO" | "EGRESO"
+}
+
 type Compra = {
     id: number
     tarjeta_id: number
@@ -44,10 +51,13 @@ type Compra = {
     cantidad_cuotas: number
     fecha_compra: string
     descripcion: string | null
+    categoria_id: number | null
+    categoria: string | null
 }
 
 type Formulario = {
     tarjetaId: string
+    categoriaId: string
     monto: string
     cuotas: string
     descripcion: string
@@ -64,6 +74,7 @@ type ComprasTarjetaPageProps = {
 
 const formularioInicial: Formulario = {
     tarjetaId: "",
+    categoriaId: "",
     monto: "",
     cuotas: "1",
     descripcion: "",
@@ -74,6 +85,7 @@ export default function ComprasTarjetaPage({
     onCambio,
 }: ComprasTarjetaPageProps) {
     const [compras, setCompras] = useState<Compra[]>([])
+    const [categorias, setCategorias] = useState<Categoria[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
@@ -106,7 +118,12 @@ export default function ComprasTarjetaPage({
 
     async function cargar() {
         try {
-            setCompras(await listarCompras())
+            const [datosCompras, datosCategorias] = await Promise.all([
+                listarCompras(),
+                listarCategorias(),
+            ])
+            setCompras(datosCompras)
+            setCategorias(datosCategorias)
         } catch (e) {
             setError(
                 e instanceof Error
@@ -257,6 +274,11 @@ export default function ComprasTarjetaPage({
             return
         }
 
+        if (!formulario.categoriaId) {
+            setErrorModal("Elegí una categoría de egreso")
+            return
+        }
+
         if (montoForm <= 0) {
             setErrorModal("El monto debe ser mayor a 0")
             return
@@ -270,6 +292,7 @@ export default function ComprasTarjetaPage({
         try {
             await crearCompra({
                 tarjeta_id: Number(formulario.tarjetaId),
+                categoria_id: Number(formulario.categoriaId),
                 monto: montoForm,
                 cantidad_cuotas: cantidadCuotas,
                 descripcion: formulario.descripcion || null,
@@ -520,6 +543,7 @@ export default function ComprasTarjetaPage({
                                     >
                                         {compra.tarjeta} ·{" "}
                                         {fechaCorta(compra.fecha_compra)} ·{" "}
+                                        {compra.categoria ?? "Sin categoría"} ·{" "}
                                         {compra.cantidad_cuotas}{" "}
                                         {compra.cantidad_cuotas === 1
                                             ? "cuota"
@@ -671,6 +695,45 @@ export default function ComprasTarjetaPage({
                             )
                         })}
                     </Select>
+
+                    <Select
+                        id="categoria-compra"
+                        label="Categoría de gasto"
+                        value={formulario.categoriaId}
+                        onChange={function (e) {
+                            setFormulario({
+                                ...formulario,
+                                categoriaId: e.target.value,
+                            })
+                        }}
+                        required
+                    >
+                        <option value="">Elegí una categoría</option>
+                        {categorias
+                            .filter(function (categoria) {
+                                return categoria.tipo === "EGRESO"
+                            })
+                            .map(function (categoria) {
+                                return (
+                                    <option
+                                        key={categoria.id}
+                                        value={categoria.id}
+                                    >
+                                        {categoria.nombre}
+                                    </option>
+                                )
+                            })}
+                    </Select>
+                    {categorias.every(function (categoria) {
+                        return categoria.tipo !== "EGRESO"
+                    }) && (
+                        <p
+                            className="text-xs"
+                            style={{ color: "var(--color-muted-foreground)" }}
+                        >
+                            Creá primero una categoría de egreso en Categorías.
+                        </p>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <MontoInput

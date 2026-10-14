@@ -356,7 +356,8 @@ def generar_movimiento(recurrente_id, usuario_id, monto=None):
                 monto=monto_final,
                 cantidad_cuotas=1,
                 descripcion=recurrente["nombre"],
-                fecha_compra=periodo
+                fecha_compra=periodo,
+                categoria_id=recurrente["categoria_id"]
             )
 
         # Recurrente con dinero propio

@@ -12,7 +12,8 @@ def crear_compra_con_cursor(
     monto,
     cantidad_cuotas,
     descripcion,
-    fecha_compra=None
+    fecha_compra=None,
+    categoria_id=None
 ):
     cursor.execute(
         """
@@ -58,11 +59,28 @@ def crear_compra_con_cursor(
             detail=f"La compra supera el límite disponible. Disponible: {disponible}"
         )
 
+    if categoria_id is not None:
+        cursor.execute(
+            """
+            SELECT id
+            FROM categoria
+            WHERE id = %s
+              AND usuario_id = %s
+              AND tipo = 'EGRESO'
+              AND estado = TRUE
+            """,
+            (categoria_id, usuario_id)
+        )
+
+        if not cursor.fetchone():
+            raise ValueError("La categoría no existe o no es una categoría de egreso")
+
     cursor.execute(
         """
         INSERT INTO movimiento
         (
             usuario_id,
+            categoria_id,
             metodo_pago_id,
             tipo,
             estado,
@@ -72,6 +90,7 @@ def crear_compra_con_cursor(
             fecha
         )
         SELECT
+            %s,
             %s,
             tc.metodo_pago_id,
             'EGRESO',
@@ -87,6 +106,7 @@ def crear_compra_con_cursor(
         """,
         (
             usuario_id,
+            categoria_id,
             descripcion,
             monto,
             fecha_compra,
@@ -211,7 +231,8 @@ def crear_compra(compra, usuario_id, fecha_compra=None):
             monto=compra.monto,
             cantidad_cuotas=compra.cantidad_cuotas,
             descripcion=compra.descripcion,
-            fecha_compra=fecha_compra
+            fecha_compra=fecha_compra,
+            categoria_id=compra.categoria_id
         )
 
         conexion.commit()
@@ -242,7 +263,9 @@ def listar_compras(usuario_id):
                 ct.monto_base,
                 ct.cantidad_cuotas,
                 ct.fecha_compra,
-                m.descripcion
+                m.descripcion,
+                m.categoria_id,
+                c.nombre AS categoria
             FROM compra_tarjeta ct
             INNER JOIN tarjeta_credito tc
                 ON ct.tarjeta_id = tc.id
@@ -250,6 +273,8 @@ def listar_compras(usuario_id):
                 ON tc.metodo_pago_id = mp.id
             INNER JOIN movimiento m
                 ON ct.movimiento_id = m.id
+            LEFT JOIN categoria c
+                ON m.categoria_id = c.id
             WHERE m.usuario_id = %s
             ORDER BY ct.fecha_compra DESC
             """,
