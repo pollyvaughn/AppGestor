@@ -7,12 +7,16 @@ from backend.services.pago_service import (
     anular_pago,
     listar_pagos_por_cuota
 )
-from backend.auth.dependencies import obtener_usuario_actual
+from backend.auth.dependencies import (
+    obtener_usuario_actual,
+    requerir_cuenta_inicial
+)
 
 
 router = APIRouter(
     prefix="/pagos",
-    tags=["Pagos"]
+    tags=["Pagos"],
+    dependencies=[Depends(requerir_cuenta_inicial)]
 )
 
 

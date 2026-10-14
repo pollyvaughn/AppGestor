@@ -1,4 +1,5 @@
 from backend.database import get_connection
+from fastapi import HTTPException
 
 
 def crear_metodo_pago(metodo, usuario_id):
@@ -58,8 +59,6 @@ def editar_metodo_pago(metodo_id, metodo, usuario_id):
     conexion = get_connection()
 
     try:
-        cursor = conexion.cursor()
-
         sql = """
             UPDATE metodo_pago
             SET tipo = %s,
@@ -94,7 +93,41 @@ def eliminar_metodo_pago(metodo_id, usuario_id):
     conexion = get_connection()
 
     try:
-        cursor = conexion.cursor()
+        cursor = conexion.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT tipo
+            FROM metodo_pago
+            WHERE id = %s
+            AND usuario_id = %s
+            AND estado = 'ACTIVO'
+            """,
+            (metodo_id, usuario_id)
+        )
+        metodo = cursor.fetchone()
+
+        if not metodo:
+            return 0
+
+        if metodo["tipo"] != "TARJETA_CREDITO":
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM metodo_pago
+                WHERE usuario_id = %s
+                AND estado = 'ACTIVO'
+                AND tipo != 'TARJETA_CREDITO'
+                """,
+                (usuario_id,)
+            )
+            cantidad = cursor.fetchone()["total"]
+
+            if cantidad <= 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se puede desactivar la última cuenta de dinero disponible"
+                )
 
         sql = """
             UPDATE metodo_pago

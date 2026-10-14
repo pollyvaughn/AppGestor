@@ -622,8 +622,9 @@ export default function RecurrentesPage({
                         onChange={function (e) {
                             cambiarCuenta(e.target.value)
                         }}
+                        required
                     >
-                        <option value="">Sin cuenta</option>
+                        <option value="">Elegí una cuenta</option>
                         {cuentasUsables.map(function (c) {
                             return (
                                 <option key={c.id} value={c.id}>
@@ -762,10 +763,9 @@ export default function RecurrentesPage({
                             onChange={function (e) {
                                 setCuentaGenerar(e.target.value)
                             }}
+                            required
                         >
-                            {generando.metodo_pago_id === null && (
-                                <option value="">Sin cuenta</option>
-                            )}
+                            <option value="">Elegí una cuenta</option>
                             {cuentasParaGenerar.map(function (cuenta) {
                                 return (
                                     <option key={cuenta.id} value={cuenta.id}>

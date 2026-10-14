@@ -1,7 +1,10 @@
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from backend.auth.dependencies import obtener_usuario_actual
+from backend.auth.dependencies import (
+    obtener_usuario_actual,
+    requerir_cuenta_inicial
+)
 from backend.models.recurrente import (
     RecurrenteCrear,
     RecurrenteEditar
@@ -17,7 +20,8 @@ from backend.services.recurrente_service import (
 
 router = APIRouter(
     prefix="/recurrentes",
-    tags=["Recurrentes"]
+    tags=["Recurrentes"],
+    dependencies=[Depends(requerir_cuenta_inicial)]
 )
 
 

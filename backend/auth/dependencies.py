@@ -80,3 +80,34 @@ def obtener_usuario_actual(
         )
 
     return usuario
+
+
+def requerir_cuenta_inicial(
+    usuario=Depends(obtener_usuario_actual)
+):
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor()
+        cursor.execute(
+            """
+            SELECT id
+            FROM metodo_pago
+            WHERE usuario_id = %s
+            AND estado = 'ACTIVO'
+            AND tipo != 'TARJETA_CREDITO'
+            LIMIT 1
+            """,
+            (usuario["id"],)
+        )
+
+        if not cursor.fetchone():
+            raise HTTPException(
+                status_code=403,
+                detail="Configurá una cuenta de dinero disponible antes de operar"
+            )
+    finally:
+        cursor.close()
+        conexion.close()
+
+    return usuario

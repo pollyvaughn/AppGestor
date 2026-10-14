@@ -3,6 +3,12 @@ from backend.services.saldo_service import actualizar_saldo, revertir_saldo
 
 
 def crear_movimiento(movimiento, usuario_id):
+    if movimiento.tipo in ("INGRESO", "EGRESO"):
+        if movimiento.categoria_id is None:
+            return None, "La categoría es obligatoria para ingresos y egresos"
+        if movimiento.metodo_pago_id is None:
+            return None, "La cuenta o método de pago es obligatorio para ingresos y egresos"
+
     conexion = get_connection()
 
     try:
@@ -34,7 +40,7 @@ def crear_movimiento(movimiento, usuario_id):
         if movimiento.metodo_pago_id is not None:
             cursor.execute(
                 """
-                SELECT id
+                SELECT id, tipo, moneda
                 FROM metodo_pago
                 WHERE id = %s
                 AND usuario_id = %s
@@ -43,8 +49,18 @@ def crear_movimiento(movimiento, usuario_id):
                 (movimiento.metodo_pago_id, usuario_id)
             )
 
-            if not cursor.fetchone():
+            metodo = cursor.fetchone()
+
+            if not metodo:
                 return None, "Método de pago no encontrado"
+
+            if movimiento.tipo in ("INGRESO", "EGRESO"):
+                if metodo["moneda"] != movimiento.moneda:
+                    return None, "La moneda del movimiento no coincide con la de la cuenta"
+                if movimiento.tipo == "INGRESO" and metodo["tipo"] == "TARJETA_CREDITO":
+                    return None, "No se puede registrar un ingreso en una tarjeta de crédito"
+                if movimiento.tipo == "EGRESO" and metodo["tipo"] == "TARJETA_CREDITO":
+                    return None, "Registrá las compras con tarjeta desde la sección Tarjetas"
 
         sql = """
             INSERT INTO movimiento
@@ -150,6 +166,12 @@ def listar_movimientos(usuario_id, categoria_id=None):
         conexion.close()
 
 def editar_movimiento(movimiento_id, movimiento, usuario_id):
+    if movimiento.tipo in ("INGRESO", "EGRESO"):
+        if movimiento.categoria_id is None:
+            return False, "La categoría es obligatoria para ingresos y egresos"
+        if movimiento.metodo_pago_id is None:
+            return False, "La cuenta o método de pago es obligatorio para ingresos y egresos"
+
     conexion = get_connection()
 
     try:
@@ -198,7 +220,7 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
         if movimiento.metodo_pago_id is not None:
             cursor.execute(
                 """
-                SELECT id
+                SELECT id, tipo, moneda
                 FROM metodo_pago
                 WHERE id = %s
                 AND usuario_id = %s
@@ -207,8 +229,18 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
                 (movimiento.metodo_pago_id, usuario_id)
             )
 
-            if not cursor.fetchone():
+            metodo = cursor.fetchone()
+
+            if not metodo:
                 return False, "Método de pago no encontrado"
+
+            if movimiento.tipo in ("INGRESO", "EGRESO"):
+                if metodo["moneda"] != movimiento.moneda:
+                    return False, "La moneda del movimiento no coincide con la de la cuenta"
+                if movimiento.tipo == "INGRESO" and metodo["tipo"] == "TARJETA_CREDITO":
+                    return False, "No se puede registrar un ingreso en una tarjeta de crédito"
+                if movimiento.tipo == "EGRESO" and metodo["tipo"] == "TARJETA_CREDITO":
+                    return False, "Registrá las compras con tarjeta desde la sección Tarjetas"
 
         # Revertir efecto del movimiento anterior
         if movimiento_actual["metodo_pago_id"] is not None:

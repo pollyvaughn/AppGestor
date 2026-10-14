@@ -25,25 +25,33 @@ def validar_referencias(cursor, recurrente, usuario_id):
     if categoria["tipo"] != recurrente.tipo:
         return "El tipo de la categoría no coincide con el tipo del recurrente"
 
-    if recurrente.metodo_pago_id is not None:
-        cursor.execute(
-            """
-            SELECT id, tipo, moneda
-            FROM metodo_pago
-            WHERE id = %s
-            AND usuario_id = %s
-            AND estado = 'ACTIVO'
-            """,
-            (recurrente.metodo_pago_id, usuario_id)
-        )
+    if recurrente.metodo_pago_id is None:
+        return "El método de pago es obligatorio para el recurrente"
 
-        metodo = cursor.fetchone()
+    cursor.execute(
+        """
+        SELECT id, tipo, moneda
+        FROM metodo_pago
+        WHERE id = %s
+        AND usuario_id = %s
+        AND estado = 'ACTIVO'
+        """,
+        (recurrente.metodo_pago_id, usuario_id)
+    )
 
-        if not metodo:
-            return "Método de pago no encontrado"
+    metodo = cursor.fetchone()
 
-        if metodo["moneda"] != recurrente.moneda:
-            return "La moneda del recurrente no coincide con la del método de pago"
+    if not metodo:
+        return "Método de pago no encontrado"
+
+    if metodo["moneda"] != recurrente.moneda:
+        return "La moneda del recurrente no coincide con la del método de pago"
+
+    if (
+        recurrente.tipo == "INGRESO"
+        and metodo["tipo"] == "TARJETA_CREDITO"
+    ):
+        return "No se puede asociar un ingreso a una tarjeta de crédito"
 
     return None
 
@@ -312,6 +320,9 @@ def generar_movimiento(
             if metodo_pago_id is not None
             else recurrente["metodo_pago_id"]
         )
+        if metodo_pago_id_final is None:
+            return None, "Elegí una cuenta para generar este período"
+
         metodo_tipo = recurrente["metodo_tipo"]
 
         if metodo_pago_id is not None:

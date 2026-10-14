@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from backend.auth.dependencies import obtener_usuario_actual
+from backend.auth.dependencies import (
+    obtener_usuario_actual,
+    requerir_cuenta_inicial
+)
 from backend.models.movimiento import (
     MovimientoCrear,
     MovimientoEditar
@@ -14,7 +17,8 @@ from backend.services.movimiento_service import (
 
 router = APIRouter(
     prefix="/movimientos",
-    tags=["Movimientos"]
+    tags=["Movimientos"],
+    dependencies=[Depends(requerir_cuenta_inicial)]
 )
 
 

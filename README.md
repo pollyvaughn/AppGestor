@@ -89,6 +89,17 @@ Si ya existía un usuario con ese email, el seed conserva su contraseña actual.
 
 ---
 
+# Configuración inicial
+
+Al iniciar sesión sin una cuenta de dinero disponible, la aplicación solicita
+crear una cuenta e ingresar su saldo actual. Ese saldo establece el punto de
+partida y no se registra como ingreso. Se debe crear al menos una categoría de
+ingreso y otra de egreso desde **Categorías** antes de registrar esos
+movimientos. Tanto la categoría como la cuenta son obligatorias para ingresos y
+egresos; las compras con tarjeta se registran desde **Tarjetas**.
+
+---
+
 # Variables de entorno
 
 Crear un archivo `.env` en la raíz del proyecto.

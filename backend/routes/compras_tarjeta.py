@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.models.ajuste import AjusteCrear
-from backend.auth.dependencies import obtener_usuario_actual
+from backend.auth.dependencies import (
+    obtener_usuario_actual,
+    requerir_cuenta_inicial
+)
 from backend.models.compra_tarjeta import CompraTarjetaCrear
 from backend.services.compra_tarjeta_service import (
     crear_compra,
@@ -20,7 +23,8 @@ from backend.services.ajuste_service import (
 
 router = APIRouter(
     prefix="/compras-tarjeta",
-    tags=["Compras con tarjeta"]
+    tags=["Compras con tarjeta"],
+    dependencies=[Depends(requerir_cuenta_inicial)]
 )
 
 

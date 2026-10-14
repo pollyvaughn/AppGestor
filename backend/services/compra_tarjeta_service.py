@@ -15,6 +15,9 @@ def crear_compra_con_cursor(
     fecha_compra=None,
     categoria_id=None
 ):
+    if categoria_id is None:
+        raise ValueError("La categoría es obligatoria para las compras con tarjeta")
+
     cursor.execute(
         """
         SELECT

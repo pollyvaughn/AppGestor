@@ -4,7 +4,7 @@ from typing import Literal
 
 class RecurrenteCrear(BaseModel):
     categoria_id: int
-    metodo_pago_id: int | None = None
+    metodo_pago_id: int
     nombre: str
     tipo: Literal["INGRESO", "EGRESO"]
     monto_base: float = Field(gt=0)
@@ -24,7 +24,7 @@ class RecurrenteCrear(BaseModel):
 
 class RecurrenteEditar(BaseModel):
     categoria_id: int
-    metodo_pago_id: int | None = None
+    metodo_pago_id: int
     nombre: str
     tipo: Literal["INGRESO", "EGRESO"]
     monto_base: float = Field(gt=0)

@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.auth.dependencies import obtener_usuario_actual
+from backend.auth.dependencies import (
+    obtener_usuario_actual,
+    requerir_cuenta_inicial
+)
 from backend.models.ajuste import AjusteCrear
 from backend.services.ajuste_service import (
     crear_ajuste,
@@ -11,7 +14,8 @@ from backend.services.ajuste_service import (
 
 router = APIRouter(
     prefix="/ajustes",
-    tags=["Ajustes"]
+    tags=["Ajustes"],
+    dependencies=[Depends(requerir_cuenta_inicial)]
 )
 
 

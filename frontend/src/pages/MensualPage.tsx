@@ -1195,8 +1195,9 @@ export default function MensualPage({
                         onChange={function (e) {
                             setFormulario({ ...formulario, categoriaId: e.target.value })
                         }}
+                        required
                     >
-                        <option value="">Sin categoría</option>
+                        <option value="">Elegí una categoría</option>
                         {categoriasDelTipo.map(function (c) {
                             return (
                                 <option key={c.id} value={c.id}>
@@ -1216,8 +1217,9 @@ export default function MensualPage({
                         onChange={function (e) {
                             cambiarCuenta(e.target.value)
                         }}
+                        required
                     >
-                        <option value="">Sin cuenta</option>
+                        <option value="">Elegí una cuenta</option>
                         {cuentasUsables.map(function (c) {
                             return (
                                 <option key={c.id} value={c.id}>

@@ -36,6 +36,7 @@ FROM (
     UNION ALL SELECT 'Servicios', 'EGRESO', '#8870AA'
     UNION ALL SELECT 'Salud', 'EGRESO', '#5E9B9B'
     UNION ALL SELECT 'Ocio', 'EGRESO', '#C4779D'
+    UNION ALL SELECT 'Tecnología', 'EGRESO', '#778899'
 ) AS datos
 WHERE NOT EXISTS (
     SELECT 1
@@ -44,6 +45,17 @@ WHERE NOT EXISTS (
       AND c.nombre = datos.nombre
       AND c.tipo = datos.tipo
       AND c.estado = TRUE
+);
+
+SET @categoria_tecnologia_id = (
+      SELECT id
+      FROM categoria
+      WHERE usuario_id = @demo_usuario_id
+        AND nombre = 'Tecnología'
+        AND tipo = 'EGRESO'
+        AND estado = TRUE
+      ORDER BY id
+      LIMIT 1
 );
 
 INSERT INTO metodo_pago (usuario_id, tipo, nombre, moneda, estado, saldo)
@@ -182,12 +194,18 @@ WHERE NOT EXISTS (
 );
 
 -- Compra en cuotas para que también haya datos en la sección de tarjetas.
+UPDATE movimiento
+SET categoria_id = @categoria_tecnologia_id
+WHERE usuario_id = @demo_usuario_id
+  AND descripcion = 'Notebook en cuotas'
+  AND categoria_id IS NULL;
+
 INSERT INTO movimiento (
-    usuario_id, metodo_pago_id, tipo, estado, descripcion,
+    usuario_id, categoria_id, metodo_pago_id, tipo, estado, descripcion,
     monto, moneda, fecha
 )
 SELECT
-    @demo_usuario_id, @visa_metodo_id, 'EGRESO', 'CONFIRMADO',
+    @demo_usuario_id, @categoria_tecnologia_id, @visa_metodo_id, 'EGRESO', 'CONFIRMADO',
     'Notebook en cuotas', 900000, 'PYG',
     DATE_ADD(CAST(DATE_FORMAT(CURDATE(), '%Y-%m-01') AS DATE), INTERVAL 8 DAY)
 WHERE NOT EXISTS (

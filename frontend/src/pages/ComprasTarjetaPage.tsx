@@ -338,6 +338,7 @@ export default function ComprasTarjetaPage({
                 tarjeta_id: compraEditando.tarjeta_id,
                 monto: Number(compraEditando.monto_base),
                 cantidad_cuotas: compraEditando.cantidad_cuotas,
+                categoria_id: compraEditando.categoria_id,
                 descripcion: descripcionEdicion || null,
             })
 
