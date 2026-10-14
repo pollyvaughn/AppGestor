@@ -18,6 +18,7 @@ import Select from "../components/ui/Select"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
+import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 import { formatearMonto } from "../lib/moneda"
 import CuotaFila from "./CuotaFila"
 import PagoCuotaModal from "./PagoCuotaModal"
@@ -70,6 +71,7 @@ type ComprasTarjetaPageProps = {
     tarjetas: Tarjeta[]
     // se llama cuando cambia la deuda de las tarjetas (compra, pago, ajuste...)
     onCambio?: () => void
+    onIrACategorias: () => void
 }
 
 const formularioInicial: Formulario = {
@@ -83,6 +85,7 @@ const formularioInicial: Formulario = {
 export default function ComprasTarjetaPage({
     tarjetas,
     onCambio,
+    onIrACategorias,
 }: ComprasTarjetaPageProps) {
     const [compras, setCompras] = useState<Compra[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -724,6 +727,9 @@ export default function ComprasTarjetaPage({
                                 )
                             })}
                     </Select>
+                    <div className="flex justify-end">
+                        <CategoriaShortcut onClick={onIrACategorias} />
+                    </div>
                     {categorias.every(function (categoria) {
                         return categoria.tipo !== "EGRESO"
                     }) && (

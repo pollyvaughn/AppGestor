@@ -16,6 +16,7 @@ import Select from "../components/ui/Select"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
+import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 import { formatearMonto } from "../lib/moneda"
 
 type Tipo = "INGRESO" | "EGRESO"
@@ -58,6 +59,10 @@ type Formulario = {
 }
 
 const MONEDAS = ["PYG", "USD", "EUR", "ARS", "BRL"]
+
+type RecurrentesPageProps = {
+    onIrACategorias: () => void
+}
 
 const FILTROS: { key: Filtro; label: string }[] = [
     { key: "TODOS", label: "Todos" },
@@ -110,7 +115,9 @@ function formularioVacio(): Formulario {
     }
 }
 
-export default function RecurrentesPage() {
+export default function RecurrentesPage({
+    onIrACategorias,
+}: RecurrentesPageProps) {
     const [recurrentes, setRecurrentes] = useState<Recurrente[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
@@ -584,6 +591,9 @@ export default function RecurrentesPage() {
                             )
                         })}
                     </Select>
+                    <div className="flex justify-end">
+                        <CategoriaShortcut onClick={onIrACategorias} />
+                    </div>
 
                     <Select
                         id="cuenta"

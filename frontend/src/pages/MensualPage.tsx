@@ -24,6 +24,7 @@ import Modal from "../components/ui/Modal"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
+import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -53,6 +54,7 @@ type Cuenta = { id: number; nombre: string; tipo: string; moneda: string }
 
 type MensualPageProps = {
     onIrATarjetas: () => void
+    onIrACategorias: () => void
 }
 
 type Formulario = {
@@ -126,7 +128,10 @@ function formularioVacio(): Formulario {
     }
 }
 
-export default function MensualPage({ onIrATarjetas }: MensualPageProps) {
+export default function MensualPage({
+    onIrATarjetas,
+    onIrACategorias,
+}: MensualPageProps) {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
@@ -1119,6 +1124,9 @@ export default function MensualPage({ onIrATarjetas }: MensualPageProps) {
                             )
                         })}
                     </Select>
+                    <div className="flex justify-end">
+                        <CategoriaShortcut onClick={onIrACategorias} />
+                    </div>
 
                     <Select
                         id="cuenta"

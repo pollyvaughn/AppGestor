@@ -10,7 +10,13 @@ type Tarjeta = {
     estado: string
 }
 
-export default function TarjetasYComprasPage() {
+type TarjetasYComprasPageProps = {
+    onIrACategorias: () => void
+}
+
+export default function TarjetasYComprasPage({
+    onIrACategorias,
+}: TarjetasYComprasPageProps) {
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
     const [version, setVersion] = useState(0)
 
@@ -38,7 +44,11 @@ export default function TarjetasYComprasPage() {
         <div className="space-y-10">
             <TarjetasPage key={version} onCambio={cargarTarjetas} />
 
-            <ComprasTarjetaPage tarjetas={tarjetas} onCambio={refrescarTodo} />
+            <ComprasTarjetaPage
+                tarjetas={tarjetas}
+                onCambio={refrescarTodo}
+                onIrACategorias={onIrACategorias}
+            />
         </div>
     )
 }
