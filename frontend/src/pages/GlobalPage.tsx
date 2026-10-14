@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { listarMovimientos } from "../services/movimientoService"
+import { listarCuentas } from "../services/cuentaService"
+import { listarTarjetas } from "../services/tarjetaService"
 import {
     type Movimiento,
     esContable,
@@ -29,8 +31,21 @@ function etiquetaMes(mes: string) {
     return `${nombreMes(mes).slice(0, 3)} ${mes.slice(2, 4)}`
 }
 
+type Cuenta = {
+    tipo: string
+    moneda: string
+    saldo: number
+}
+
+type Tarjeta = {
+    moneda: string
+    deuda_actual: number
+}
+
 export default function GlobalPage() {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+    const [cuentas, setCuentas] = useState<Cuenta[]>([])
+    const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
     const [monedaElegida, setMonedaElegida] = useState("")
     const [categoriasExpandidas, setCategoriasExpandidas] = useState({
         INGRESO: false,
@@ -41,12 +56,19 @@ export default function GlobalPage() {
 
     async function cargar() {
         try {
-            setMovimientos(await listarMovimientos())
+            const [movs, ctas, tjs] = await Promise.all([
+                listarMovimientos(),
+                listarCuentas(),
+                listarTarjetas(),
+            ])
+            setMovimientos(movs)
+            setCuentas(ctas)
+            setTarjetas(tjs)
         } catch (e) {
             setError(
                 e instanceof Error
                     ? e.message
-                    : "No se pudieron cargar los movimientos"
+                    : "No se pudieron cargar los datos globales"
             )
         } finally {
             setCargando(false)
@@ -63,9 +85,18 @@ export default function GlobalPage() {
 
     const monedas = Array.from(
         new Set(
-            contables.map(function (m) {
-                return m.moneda
-            })
+            contables
+                .map(function (m) {
+                    return m.moneda
+                })
+                .concat(
+                    cuentas.map(function (cuenta) {
+                        return cuenta.moneda
+                    }),
+                    tarjetas.map(function (tarjeta) {
+                        return tarjeta.moneda
+                    })
+                )
         )
     ).sort()
 
@@ -124,6 +155,17 @@ export default function GlobalPage() {
     }
 
     const balance = ingresos - egresos
+    const disponible = cuentas.reduce(function (total, cuenta) {
+        return cuenta.tipo === "TARJETA_CREDITO" || cuenta.moneda !== moneda
+            ? total
+            : total + Number(cuenta.saldo)
+    }, 0)
+    const deudaTarjetas = tarjetas.reduce(function (total, tarjeta) {
+        return tarjeta.moneda === moneda
+            ? total + Number(tarjeta.deuda_actual)
+            : total
+    }, 0)
+    const posicionNeta = disponible - deudaTarjetas
 
     const meses = Object.keys(porMes).sort().slice(-12)
     const promedio = meses.length > 0 ? balance / meses.length : 0
@@ -147,7 +189,6 @@ export default function GlobalPage() {
         categoriasEgreso.length > 0 ? categoriasEgreso[0].total : 1
 
     const resumen = [
-        { titulo: "Balance total", valor: balance, color: balance >= 0 ? "var(--color-income)" : "var(--color-expense)" },
         { titulo: "Ingresos totales", valor: ingresos, color: "var(--color-income)" },
         { titulo: "Gastos totales", valor: egresos, color: "var(--color-expense)" },
         { titulo: "Balance medio / mes", valor: promedio, color: "var(--color-foreground)" },
@@ -163,7 +204,7 @@ export default function GlobalPage() {
             {cargando && <Cargando />}
 
             {!cargando && !error && monedas.length === 0 && (
-                <EstadoVacio texto="Todavía no hay movimientos." />
+                <EstadoVacio texto="Todavía no hay movimientos ni cuentas para resumir." />
             )}
 
             {!cargando && monedas.length > 0 && (
@@ -207,8 +248,59 @@ export default function GlobalPage() {
                         })}
                     </div>
 
-                    {/* Tarjetas resumen */}
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                    {/* Balance y posición neta */}
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                        <div className="p-5 space-y-2" style={estiloCard}>
+                            <p className="text-xs" style={estiloTitulo}>
+                                Balance de ingresos - gastos
+                            </p>
+                            <p
+                                className="text-xl font-light break-words"
+                                style={{
+                                    fontFamily: "var(--font-mono)",
+                                    color: balance >= 0
+                                        ? "var(--color-income)"
+                                        : "var(--color-expense)",
+                                }}
+                            >
+                                {formatearMonto(balance, moneda)}{" "}
+                                <span className="text-sm">{moneda}</span>
+                            </p>
+                        </div>
+
+                        <div className="p-5 space-y-2" style={estiloCard}>
+                            <p className="text-xs" style={estiloTitulo}>
+                                Posición neta
+                            </p>
+                            <p
+                                className="text-xl font-light break-words"
+                                style={{
+                                    fontFamily: "var(--font-mono)",
+                                    color: posicionNeta >= 0
+                                        ? "var(--color-income)"
+                                        : "var(--color-expense)",
+                                }}
+                            >
+                                {formatearMonto(posicionNeta, moneda)}{" "}
+                                <span className="text-sm">{moneda}</span>
+                            </p>
+                            <div
+                                className="space-y-1 text-xs"
+                                style={{ color: "var(--color-muted-foreground)" }}
+                            >
+                                <p>Disponible - deuda pendiente.</p>
+                                <p>
+                                    Disponible: {formatearMonto(disponible, moneda)} {moneda}
+                                </p>
+                                <p>
+                                    Deuda pendiente en tarjetas: {formatearMonto(deudaTarjetas, moneda)} {moneda}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Ingresos, gastos y promedio */}
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {resumen.map(function (r) {
                             return (
                                 <div key={r.titulo} className="p-5 space-y-2" style={estiloCard}>
