@@ -2,16 +2,40 @@ import { useEffect, useState } from "react"
 import { listarMovimientos } from "../services/movimientoService"
 import { listarCuentas } from "../services/cuentaService"
 import { listarTarjetas } from "../services/tarjetaService"
+import { listarCategorias } from "../services/categoriaService"
 import {
     type Movimiento,
     esContable,
-    mesDe,
-    nombreMes,
+    flujoNeto,
+    patrimonioPorMoneda,
+    totalesPorMoneda,
 } from "../lib/movimientos"
 import { formatearMonto } from "../lib/moneda"
+import {
+    type ClavePeriodo,
+    dentroDe,
+    diasEnPeriodo,
+    fechaCorta,
+    mesesEnPeriodo,
+    periodoActual,
+    periodoAnterior,
+} from "../lib/periodo"
+import {
+    formatearPorcentaje,
+    ratioEndeudamiento,
+    tasaAhorro,
+    variacionPorcentual,
+} from "../lib/resumen"
+import { composicionGastos, serieMensual } from "../lib/graficos"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
+import KpiCard from "../components/ui/KpiCard"
+import SelectorPeriodo from "../components/ui/SelectorPeriodo"
+import EvolucionChart from "../components/global/EvolucionChart"
+import ComposicionGastoChart from "../components/global/ComposicionGastoChart"
+import RitmoGastoChart from "../components/global/RitmoGastoChart"
+import TablaMensual from "../components/global/TablaMensual"
 
 const estiloCard = {
     background: "var(--color-card)",
@@ -22,13 +46,12 @@ const estiloCard = {
 const estiloTitulo = {
     color: "var(--color-muted-foreground)",
     fontFamily: "var(--font-mono)",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.08em",
 }
 
-function etiquetaMes(mes: string) {
-    // "2026-09" => "Sep 26"
-    return `${nombreMes(mes).slice(0, 3)} ${mes.slice(2, 4)}`
+const SIN_TOTALES = { ingresos: 0, egresos: 0 }
+
+function textoOperaciones(cantidad: number) {
+    return cantidad === 1 ? "1 operación" : `${cantidad} operaciones`
 }
 
 type Cuenta = {
@@ -42,28 +65,33 @@ type Tarjeta = {
     deuda_actual: number
 }
 
+type Categoria = {
+    id: number
+    color: string | null
+}
+
 export default function GlobalPage() {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
+    const [categorias, setCategorias] = useState<Categoria[]>([])
     const [monedaElegida, setMonedaElegida] = useState("")
-    const [categoriasExpandidas, setCategoriasExpandidas] = useState({
-        INGRESO: false,
-        EGRESO: false,
-    })
+    const [periodoClave, setPeriodoClave] = useState<ClavePeriodo>("mes")
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
 
     async function cargar() {
         try {
-            const [movs, ctas, tjs] = await Promise.all([
+            const [movs, ctas, tjs, cats] = await Promise.all([
                 listarMovimientos(),
                 listarCuentas(),
                 listarTarjetas(),
+                listarCategorias(),
             ])
             setMovimientos(movs)
             setCuentas(ctas)
             setTarjetas(tjs)
+            setCategorias(cats)
         } catch (e) {
             setError(
                 e instanceof Error
@@ -100,66 +128,38 @@ export default function GlobalPage() {
         )
     ).sort()
 
-    // si todavía no eligió moneda (o la elegida ya no existe), usa la primera
-    const moneda = monedas.includes(monedaElegida) ? monedaElegida : monedas[0]
+    // si todavía no eligió moneda (o la elegida ya no existe): guaraníes si hay, si no la primera
+    const moneda = monedas.includes(monedaElegida)
+        ? monedaElegida
+        : monedas.includes("PYG")
+          ? "PYG"
+          : monedas[0]
 
-    const deLaMoneda = contables.filter(function (m) {
-        return m.moneda === moneda
+    // Periodo elegido y el tramo equivalente anterior (para comparar)
+    const periodo = periodoActual(periodoClave)
+    const anterior = periodoAnterior(periodoClave, periodo)
+
+    const delPeriodo = contables.filter(function (m) {
+        return dentroDe(m, periodo)
+    })
+    const delAnterior = contables.filter(function (m) {
+        return dentroDe(m, anterior)
     })
 
-    let ingresos = 0
-    let egresos = 0
-    const porMes: Record<string, { ingresos: number; egresos: number }> = {}
-    const porCategoriaIngreso: Record<
-        string,
-        { id: number | null; nombre: string; total: number }
-    > = {}
-    const porCategoriaEgreso: Record<
-        string,
-        { id: number | null; nombre: string; total: number }
-    > = {}
+    const totales = totalesPorMoneda(delPeriodo)[moneda] ?? SIN_TOTALES
+    const totalesAnterior =
+        totalesPorMoneda(delAnterior)[moneda] ?? SIN_TOTALES
 
-    for (const m of deLaMoneda) {
-        const monto = Number(m.monto)
-        const clave = mesDe(m)
+    const ingresos = totales.ingresos
+    const egresos = totales.egresos
+    const flujo = flujoNeto(totales)
 
-        if (!porMes[clave]) {
-            porMes[clave] = { ingresos: 0, egresos: 0 }
-        }
+    const cantidadEgresos = delPeriodo.filter(function (m) {
+        return m.moneda === moneda && m.tipo === "EGRESO"
+    }).length
 
-        if (m.tipo === "INGRESO") {
-            ingresos += monto
-            porMes[clave].ingresos += monto
-
-            const key = `INGRESO:${m.categoria_id ?? "sin-categoria"}`
-            const categoria = porCategoriaIngreso[key] ?? {
-                id: m.categoria_id,
-                nombre: m.categoria ?? "Sin categoría",
-                total: 0,
-            }
-            categoria.total += monto
-            porCategoriaIngreso[key] = categoria
-        } else {
-            egresos += monto
-            porMes[clave].egresos += monto
-
-            const key = `EGRESO:${m.categoria_id ?? "sin-categoria"}`
-            const categoria = porCategoriaEgreso[key] ?? {
-                id: m.categoria_id,
-                nombre: m.categoria ?? "Sin categoría",
-                total: 0,
-            }
-            categoria.total += monto
-            porCategoriaEgreso[key] = categoria
-        }
-    }
-
-    const balance = ingresos - egresos
-    const disponible = cuentas.reduce(function (total, cuenta) {
-        return cuenta.tipo === "TARJETA_CREDITO" || cuenta.moneda !== moneda
-            ? total
-            : total + Number(cuenta.saldo)
-    }, 0)
+    // Estos dos son de hoy: no dependen del periodo elegido
+    const disponible = patrimonioPorMoneda(cuentas)[moneda] ?? 0
     const deudaTarjetas = tarjetas.reduce(function (total, tarjeta) {
         return tarjeta.moneda === moneda
             ? total + Number(tarjeta.deuda_actual)
@@ -167,32 +167,54 @@ export default function GlobalPage() {
     }, 0)
     const posicionNeta = disponible - deudaTarjetas
 
-    const meses = Object.keys(porMes).sort().slice(-12)
-    const promedio = meses.length > 0 ? balance / meses.length : 0
+    // KPIs
+    const ahorro = tasaAhorro(ingresos, egresos)
+    const variacion = variacionPorcentual(egresos, totalesAnterior.egresos)
 
-    const maximoMes = Math.max(
-        1,
-        ...meses.map(function (mes) {
-            return Math.max(porMes[mes].ingresos, porMes[mes].egresos)
-        })
+    // Métricas secundarias
+    const dias = diasEnPeriodo(periodo)
+    const promedioDiario = egresos / dias
+    const ingresoPromedioMensual = ingresos / mesesEnPeriodo(periodo)
+    const endeudamiento = ratioEndeudamiento(
+        deudaTarjetas,
+        ingresoPromedioMensual
     )
 
-    const categoriasIngreso = Object.values(porCategoriaIngreso).sort(function (a, b) {
-        return b.total - a.total
-    })
-    const categoriasEgreso = Object.values(porCategoriaEgreso).sort(function (a, b) {
-        return b.total - a.total
-    })
-    const maximoCategoriaIngreso =
-        categoriasIngreso.length > 0 ? categoriasIngreso[0].total : 1
-    const maximoCategoriaEgreso =
-        categoriasEgreso.length > 0 ? categoriasEgreso[0].total : 1
+    // Datos de los gráficos
+    const serie = serieMensual(contables, moneda)
 
-    const resumen = [
-        { titulo: "Ingresos totales", valor: ingresos, color: "var(--color-income)" },
-        { titulo: "Gastos totales", valor: egresos, color: "var(--color-expense)" },
-        { titulo: "Balance medio / mes", valor: promedio, color: "var(--color-foreground)" },
-    ]
+    const colores: Record<number, string> = {}
+
+    for (const categoria of categorias) {
+        if (categoria.color) {
+            colores[categoria.id] = categoria.color
+        }
+    }
+
+    const porciones = composicionGastos(delPeriodo, moneda, colores)
+
+    // Fila de una métrica secundaria
+    function fila(titulo: string, valor: string, detalle: string) {
+        return (
+            <div key={titulo}>
+                <dt className="text-xs" style={estiloTitulo}>
+                    {titulo}
+                </dt>
+                <dd
+                    className="text-lg font-light break-words"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                >
+                    {valor}
+                </dd>
+                <dd
+                    className="text-xs"
+                    style={{ color: "var(--color-muted-foreground)" }}
+                >
+                    {detalle}
+                </dd>
+            </div>
+        )
+    }
 
     // ---------- Pantalla ----------
 
@@ -209,331 +231,182 @@ export default function GlobalPage() {
 
             {!cargando && monedas.length > 0 && (
                 <>
-                    {/* Selector de moneda */}
-                    <div
-                        role="group"
-                        aria-label="Moneda"
-                        className="flex flex-wrap items-center gap-2"
-                    >
-                        <span className="text-xs" style={estiloTitulo} aria-hidden="true">
-                            Moneda
-                        </span>
+                    {/* Periodo y moneda */}
+                    <div className="space-y-3">
+                        <SelectorPeriodo
+                            value={periodoClave}
+                            onChange={setPeriodoClave}
+                        />
 
-                        {monedas.map(function (mon) {
-                            const activa = mon === moneda
+                        <p
+                            className="text-xs"
+                            style={{ color: "var(--color-muted-foreground)" }}
+                        >
+                            Del {fechaCorta(periodo.desde)} al{" "}
+                            {fechaCorta(periodo.hasta)}. Se compara con el
+                            mismo tramo anterior ({fechaCorta(anterior.desde)}{" "}
+                            al {fechaCorta(anterior.hasta)}).
+                        </p>
 
-                            return (
-                                <button
-                                    key={mon}
-                                    type="button"
-                                    aria-pressed={activa}
-                                    onClick={function () {
-                                        setMonedaElegida(mon)
-                                    }}
-                                    className="px-3 py-1.5 min-h-11 md:min-h-0 text-xs"
-                                    style={{
-                                        borderRadius: "var(--radius-sm)",
-                                        border: "1px solid var(--color-border)",
-                                        background: activa
-                                            ? "var(--color-foreground)"
-                                            : "transparent",
-                                        color: activa
-                                            ? "var(--color-background)"
-                                            : "var(--color-muted-foreground)",
-                                    }}
-                                >
-                                    {mon}
-                                </button>
-                            )
-                        })}
-                    </div>
-
-                    {/* Balance y posición neta */}
-                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                        <div className="p-5 space-y-2" style={estiloCard}>
-                            <p className="text-xs" style={estiloTitulo}>
-                                Balance de ingresos - gastos
-                            </p>
-                            <p
-                                className="text-xl font-light break-words"
-                                style={{
-                                    fontFamily: "var(--font-mono)",
-                                    color: balance >= 0
-                                        ? "var(--color-income)"
-                                        : "var(--color-expense)",
-                                }}
-                            >
-                                {formatearMonto(balance, moneda)}{" "}
-                                <span className="text-sm">{moneda}</span>
-                            </p>
-                        </div>
-
-                        <div className="p-5 space-y-2" style={estiloCard}>
-                            <p className="text-xs" style={estiloTitulo}>
-                                Posición neta
-                            </p>
-                            <p
-                                className="text-xl font-light break-words"
-                                style={{
-                                    fontFamily: "var(--font-mono)",
-                                    color: posicionNeta >= 0
-                                        ? "var(--color-income)"
-                                        : "var(--color-expense)",
-                                }}
-                            >
-                                {formatearMonto(posicionNeta, moneda)}{" "}
-                                <span className="text-sm">{moneda}</span>
-                            </p>
+                        {monedas.length > 1 && (
                             <div
-                                className="space-y-1 text-xs"
-                                style={{ color: "var(--color-muted-foreground)" }}
+                                role="group"
+                                aria-label="Moneda"
+                                className="flex flex-wrap items-center gap-2"
                             >
-                                <p>Disponible - deuda pendiente.</p>
-                                <p>
-                                    Disponible: {formatearMonto(disponible, moneda)} {moneda}
-                                </p>
-                                <p>
-                                    Deuda pendiente en tarjetas: {formatearMonto(deudaTarjetas, moneda)} {moneda}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                                <span
+                                    className="text-xs"
+                                    style={estiloTitulo}
+                                    aria-hidden="true"
+                                >
+                                    Moneda
+                                </span>
 
-                    {/* Ingresos, gastos y promedio */}
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {resumen.map(function (r) {
-                            return (
-                                <div key={r.titulo} className="p-5 space-y-2" style={estiloCard}>
-                                    <p className="text-xs" style={estiloTitulo}>
-                                        {r.titulo}
-                                    </p>
-                                    <p
-                                        className="text-xl font-light break-words"
-                                        style={{ fontFamily: "var(--font-mono)", color: r.color }}
-                                    >
-                                        {formatearMonto(r.valor, moneda)}{" "}
-                                        <span className="text-sm">{moneda}</span>
-                                    </p>
-                                </div>
-                            )
-                        })}
-                    </div>
-
-                    {/* Evolución mensual */}
-                    <section className="p-4 sm:p-6" style={estiloCard}>
-                        <h2 className="text-xs mb-5" style={estiloTitulo}>
-                            Evolución mensual
-                        </h2>
-
-                        {/* El gráfico es solo visual: los mismos datos están en la tabla de abajo */}
-                        <div className="overflow-x-auto" aria-hidden="true">
-                            <div className="flex items-end gap-3" style={{ minWidth: "min-content" }}>
-                                {meses.map(function (mes) {
-                                    const d = porMes[mes]
+                                {monedas.map(function (mon) {
+                                    const activa = mon === moneda
 
                                     return (
-                                        <div
-                                            key={mes}
-                                            className="flex flex-col items-center gap-1 shrink-0"
-                                            style={{ width: "44px" }}
+                                        <button
+                                            key={mon}
+                                            type="button"
+                                            aria-pressed={activa}
+                                            onClick={function () {
+                                                setMonedaElegida(mon)
+                                            }}
+                                            className="px-3 py-1.5 min-h-11 md:min-h-0 text-xs"
+                                            style={{
+                                                borderRadius: "var(--radius-sm)",
+                                                border: "1px solid var(--color-border)",
+                                                background: activa
+                                                    ? "var(--color-foreground)"
+                                                    : "transparent",
+                                                color: activa
+                                                    ? "var(--color-background)"
+                                                    : "var(--color-muted-foreground)",
+                                            }}
                                         >
-                                            <div
-                                                className="flex items-end gap-1 w-full"
-                                                style={{ height: "120px" }}
-                                            >
-                                                <div
-                                                    className="flex-1"
-                                                    style={{
-                                                        height: `${(d.ingresos / maximoMes) * 100}%`,
-                                                        minHeight: d.ingresos > 0 ? "2px" : "0",
-                                                        background: "var(--color-income)",
-                                                        borderRadius: "2px 2px 0 0",
-                                                    }}
-                                                />
-                                                <div
-                                                    className="flex-1"
-                                                    style={{
-                                                        height: `${(d.egresos / maximoMes) * 100}%`,
-                                                        minHeight: d.egresos > 0 ? "2px" : "0",
-                                                        background: "var(--color-expense)",
-                                                        borderRadius: "2px 2px 0 0",
-                                                    }}
-                                                />
-                                            </div>
-                                            <span
-                                                style={{
-                                                    color: "var(--color-muted-foreground)",
-                                                    fontFamily: "var(--font-mono)",
-                                                    fontSize: "11px",
-                                                }}
-                                            >
-                                                {etiquetaMes(mes)}
-                                            </span>
-                                        </div>
+                                            {mon}
+                                        </button>
                                     )
                                 })}
                             </div>
-                        </div>
+                        )}
+                    </div>
 
-                        <div className="flex gap-4 mt-4">
-                            <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
-                                <span className="w-3 h-2 rounded" style={{ background: "var(--color-income)" }} />
-                                Ingresos
-                            </span>
-                            <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
-                                <span className="w-3 h-2 rounded" style={{ background: "var(--color-expense)" }} />
-                                Gastos
-                            </span>
-                        </div>
+                    {/* KPIs */}
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                        <KpiCard
+                            titulo="Liquidez real"
+                            valor={formatearMonto(disponible, moneda)}
+                            unidad={moneda}
+                            detalle="Saldo actual de tus cuentas"
+                            color={
+                                disponible >= 0
+                                    ? "var(--color-income)"
+                                    : "var(--color-expense)"
+                            }
+                        />
 
-                        <details className="mt-4 text-sm">
-                            <summary className="cursor-pointer min-h-11 md:min-h-0 flex items-center">
-                                Ver datos en tabla
-                            </summary>
+                        <KpiCard
+                            titulo="Tasa de ahorro"
+                            valor={
+                                ahorro === null
+                                    ? "—"
+                                    : formatearPorcentaje(ahorro)
+                            }
+                            detalle={
+                                ahorro === null
+                                    ? "Sin ingresos en el periodo"
+                                    : `Flujo neto: ${flujo >= 0 ? "+" : "−"}${formatearMonto(Math.abs(flujo), moneda)} ${moneda}`
+                            }
+                            color={
+                                ahorro === null
+                                    ? "var(--color-muted-foreground)"
+                                    : ahorro >= 0
+                                      ? "var(--color-income)"
+                                      : "var(--color-expense)"
+                            }
+                        />
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full mt-2 text-xs">
-                                    <caption className="sr-only">
-                                        Ingresos y gastos por mes en {moneda}
-                                    </caption>
-                                    <thead>
-                                        <tr>
-                                            <th scope="col" className="text-left py-1">Mes</th>
-                                            <th scope="col" className="text-right py-1">Ingresos</th>
-                                            <th scope="col" className="text-right py-1">Gastos</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody style={{ fontFamily: "var(--font-mono)" }}>
-                                        {meses.map(function (mes) {
-                                            return (
-                                                <tr
-                                                    key={mes}
-                                                    style={{ borderTop: "1px solid var(--color-border)" }}
-                                                >
-                                                    <th scope="row" className="text-left font-normal py-1.5">
-                                                        {etiquetaMes(mes)}
-                                                    </th>
-                                                    <td
-                                                        className="text-right py-1.5"
-                                                        style={{ color: "var(--color-income)" }}
-                                                    >
-                                                        {formatearMonto(porMes[mes].ingresos, moneda)}
-                                                    </td>
-                                                    <td
-                                                        className="text-right py-1.5"
-                                                        style={{ color: "var(--color-expense)" }}
-                                                    >
-                                                        {formatearMonto(porMes[mes].egresos, moneda)}
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </details>
+                        <KpiCard
+                            titulo="Gastos del periodo"
+                            valor={formatearMonto(egresos, moneda)}
+                            unidad={moneda}
+                            detalle={textoOperaciones(cantidadEgresos)}
+                            color="var(--color-expense)"
+                        />
+
+                        <KpiCard
+                            titulo="Variación de gasto"
+                            valor={
+                                variacion === null
+                                    ? "—"
+                                    : formatearPorcentaje(variacion, true)
+                            }
+                            detalle={
+                                variacion === null
+                                    ? "Sin gastos en el periodo anterior"
+                                    : `Antes: ${formatearMonto(totalesAnterior.egresos, moneda)} ${moneda}`
+                            }
+                            color={
+                                variacion === null || variacion === 0
+                                    ? "var(--color-muted-foreground)"
+                                    : variacion > 0
+                                      ? "var(--color-expense)"
+                                      : "var(--color-income)"
+                            }
+                        />
+                    </div>
+
+                    {/* Métricas secundarias */}
+                    <section className="p-4 sm:p-6" style={estiloCard}>
+                        <h2 className="text-xs mb-4" style={estiloTitulo}>
+                            Métricas del periodo
+                        </h2>
+
+                        <dl className="grid gap-5 grid-cols-1 sm:grid-cols-2">
+                            {fila(
+                                "Promedio de gasto diario",
+                                `${formatearMonto(promedioDiario, moneda)} ${moneda}`,
+                                `${dias} ${dias === 1 ? "día" : "días"} en el periodo`
+                            )}
+
+                            {fila(
+                                "Ratio de endeudamiento",
+                                endeudamiento === null
+                                    ? "—"
+                                    : formatearPorcentaje(endeudamiento),
+                                endeudamiento === null
+                                    ? "Sin ingresos en el periodo para comparar"
+                                    : `Deuda en tarjetas sobre un ingreso promedio de ${formatearMonto(ingresoPromedioMensual, moneda)} ${moneda} al mes`
+                            )}
+
+                            {fila(
+                                "Deuda pendiente en tarjetas",
+                                `${formatearMonto(deudaTarjetas, moneda)} ${moneda}`,
+                                "Cuotas pendientes hoy"
+                            )}
+
+                            {fila(
+                                "Posición neta",
+                                `${formatearMonto(posicionNeta, moneda)} ${moneda}`,
+                                "Liquidez real menos deuda pendiente"
+                            )}
+                        </dl>
                     </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {[
-                            {
-                                tipo: "INGRESO" as const,
-                                titulo: "Ingresos por categoría",
-                                vacio: "Sin ingresos en esta moneda.",
-                                categorias: categoriasIngreso,
-                                maximo: maximoCategoriaIngreso,
-                                color: "var(--color-income)",
-                            },
-                            {
-                                tipo: "EGRESO" as const,
-                                titulo: "Gastos por categoría",
-                                vacio: "Sin gastos en esta moneda.",
-                                categorias: categoriasEgreso,
-                                maximo: maximoCategoriaEgreso,
-                                color: "var(--color-expense)",
-                            },
-                        ].map(function (grupo) {
-                            const expandida = categoriasExpandidas[grupo.tipo]
-                            const visibles = expandida
-                                ? grupo.categorias
-                                : grupo.categorias.slice(0, 5)
+                    {/* Gráficos (el orden final lo definimos en el Módulo 4) */}
+                    <EvolucionChart datos={serie} moneda={moneda} />
 
-                            return (
-                                <section
-                                    key={grupo.tipo}
-                                    className="p-4 sm:p-6 self-start"
-                                    style={estiloCard}
-                                >
-                                    <h2 className="text-xs mb-5" style={estiloTitulo}>
-                                        {grupo.titulo}
-                                    </h2>
+                    <ComposicionGastoChart
+                        porciones={porciones}
+                        total={egresos}
+                        moneda={moneda}
+                    />
 
-                                    {grupo.categorias.length === 0 && (
-                                        <EstadoVacio texto={grupo.vacio} />
-                                    )}
+                    <RitmoGastoChart movimientos={contables} moneda={moneda} />
 
-                                    <div
-                                        id={`categorias-${grupo.tipo.toLowerCase()}-global`}
-                                        className="space-y-4"
-                                    >
-                                        {visibles.map(function (categoria) {
-                                            return (
-                                                <div
-                                                    key={`${grupo.tipo}:${categoria.id ?? "sin-categoria"}`}
-                                                    className="space-y-1.5"
-                                                >
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <span className="text-sm truncate">
-                                                            {categoria.nombre}
-                                                        </span>
-                                                        <span
-                                                            className="text-xs shrink-0"
-                                                            style={{ fontFamily: "var(--font-mono)" }}
-                                                        >
-                                                            {formatearMonto(categoria.total, moneda)} {moneda}
-                                                        </span>
-                                                    </div>
-                                                    <div
-                                                        className="h-1.5 w-full rounded-full"
-                                                        style={{ background: "var(--color-muted)" }}
-                                                        aria-hidden="true"
-                                                    >
-                                                        <div
-                                                            className="h-full rounded-full"
-                                                            style={{
-                                                                width: `${(categoria.total / grupo.maximo) * 100}%`,
-                                                                background: grupo.color,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-
-                                    {grupo.categorias.length > 5 && (
-                                        <button
-                                            type="button"
-                                            aria-expanded={expandida}
-                                            aria-controls={`categorias-${grupo.tipo.toLowerCase()}-global`}
-                                            onClick={function () {
-                                                setCategoriasExpandidas({
-                                                    ...categoriasExpandidas,
-                                                    [grupo.tipo]: !expandida,
-                                                })
-                                            }}
-                                            className="mt-4 text-xs underline min-h-11 md:min-h-0"
-                                            style={{ color: "var(--color-muted-foreground)" }}
-                                        >
-                                            {expandida
-                                                ? "Ver menos"
-                                                : `Ver más (+${grupo.categorias.length - 5})`}
-                                        </button>
-                                    )}
-                                </section>
-                            )
-                        })}
-                    </div>
+                    <TablaMensual datos={serie} moneda={moneda} />
                 </>
             )}
         </div>

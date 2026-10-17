@@ -94,6 +94,40 @@ SET @visa_metodo_id = (
     ORDER BY id LIMIT 1
 );
 
+-- Saldo inicial de las cuentas de la demo. No cuenta como ingreso.
+-- Se fecha en el primer mes de la demo (hace cinco meses), antes del resto
+-- de los movimientos. Los montos son los mismos con que se crean las cuentas.
+INSERT INTO movimiento (
+    usuario_id, categoria_id, metodo_pago_id, tipo, estado,
+    descripcion, monto, moneda, fecha
+)
+SELECT
+    @demo_usuario_id,
+    NULL,
+    mp.id,
+    'SALDO_INICIAL',
+    'CONFIRMADO',
+    'Saldo inicial',
+    datos.monto,
+    mp.moneda,
+    DATE_SUB(CAST(DATE_FORMAT(CURDATE(), '%Y-%m-01') AS DATE), INTERVAL 5 MONTH)
+FROM (
+    SELECT 'Cuenta principal' AS nombre, 8500000 AS monto
+    UNION ALL SELECT 'Billetera diaria', 420000
+    UNION ALL SELECT 'Efectivo', 180000
+) AS datos
+INNER JOIN metodo_pago mp
+    ON mp.usuario_id = @demo_usuario_id
+   AND mp.nombre = datos.nombre
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM movimiento existente
+    WHERE existente.usuario_id = @demo_usuario_id
+      AND existente.metodo_pago_id = mp.id
+      AND existente.tipo = 'SALDO_INICIAL'
+);
+
+
 INSERT INTO cuenta_bancaria (metodo_pago_id, tipo_cuenta, banco, numero_referencia)
 SELECT @cuenta_principal_id, 'AHORRO', 'Banco Demo', '**** 4821'
 WHERE NOT EXISTS (
