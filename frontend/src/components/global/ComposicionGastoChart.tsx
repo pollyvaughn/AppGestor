@@ -36,7 +36,7 @@ export default function ComposicionGastoChart({
             {porciones.length === 0 ? (
                 <EstadoVacio texto="Sin gastos en este periodo." />
             ) : (
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 items-center">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 items-center">
                     <div className="relative" style={{ height: 220 }}>
                         {/* Solo visual: la lista de al lado tiene los mismos datos */}
                         <div style={{ height: "100%" }} aria-hidden="true">

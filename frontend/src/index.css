@@ -8,6 +8,10 @@ body,
   height: 100%;
 }
 
+html {
+  zoom: 1.1;
+}
+
 @theme inline {
   --font-sans: 'DM Sans', sans-serif;
   --font-mono: 'DM Mono', monospace;

@@ -143,6 +143,24 @@ FastAPI también proporciona documentación automática:
 ```text
 http://127.0.0.1:8000/docs
 ```
+# Ejecutar el frontend
+
+En otra terminal, desde la raíz del proyecto:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+`npm install` instala todo lo que está en `package.json`, incluida recharts
+(gráficos de la pantalla Global). Si alguien agrega una librería nueva:
+
+```bash
+npm install nombre-del-paquete
+```
+
+y sube `package.json` y `package-lock.json` al repositorio.
 
 ---
 # Flujo básico de trabajo

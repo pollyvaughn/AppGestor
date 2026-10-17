@@ -231,7 +231,7 @@ export default function GlobalPage() {
 
             {!cargando && monedas.length > 0 && (
                 <>
-                    {/* Periodo y moneda */}
+                    {/* Fila 1: selector de periodo y moneda + 4 KPIs */}
                     <div className="space-y-3">
                         <SelectorPeriodo
                             value={periodoClave}
@@ -293,7 +293,6 @@ export default function GlobalPage() {
                         )}
                     </div>
 
-                    {/* KPIs */}
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                         <KpiCard
                             titulo="Liquidez real"
@@ -358,54 +357,62 @@ export default function GlobalPage() {
                         />
                     </div>
 
-                    {/* Métricas secundarias */}
-                    <section className="p-4 sm:p-6" style={estiloCard}>
-                        <h2 className="text-xs mb-4" style={estiloTitulo}>
-                            Métricas del periodo
-                        </h2>
+                    {/* Fila 2: evolución histórica + composición del gasto */}
+                    <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+                        <EvolucionChart datos={serie} moneda={moneda} />
 
-                        <dl className="grid gap-5 grid-cols-1 sm:grid-cols-2">
-                            {fila(
-                                "Promedio de gasto diario",
-                                `${formatearMonto(promedioDiario, moneda)} ${moneda}`,
-                                `${dias} ${dias === 1 ? "día" : "días"} en el periodo`
-                            )}
+                        <ComposicionGastoChart
+                            porciones={porciones}
+                            total={egresos}
+                            moneda={moneda}
+                        />
+                    </div>
 
-                            {fila(
-                                "Ratio de endeudamiento",
-                                endeudamiento === null
-                                    ? "—"
-                                    : formatearPorcentaje(endeudamiento),
-                                endeudamiento === null
-                                    ? "Sin ingresos en el periodo para comparar"
-                                    : `Deuda en tarjetas sobre un ingreso promedio de ${formatearMonto(ingresoPromedioMensual, moneda)} ${moneda} al mes`
-                            )}
+                    {/* Fila 3: ritmo de gasto + métricas secundarias */}
+                    <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+                        <RitmoGastoChart
+                            movimientos={contables}
+                            moneda={moneda}
+                        />
 
-                            {fila(
-                                "Deuda pendiente en tarjetas",
-                                `${formatearMonto(deudaTarjetas, moneda)} ${moneda}`,
-                                "Cuotas pendientes hoy"
-                            )}
+                        <section className="p-4 sm:p-6" style={estiloCard}>
+                            <h2 className="text-xs mb-4" style={estiloTitulo}>
+                                Métricas del periodo
+                            </h2>
 
-                            {fila(
-                                "Posición neta",
-                                `${formatearMonto(posicionNeta, moneda)} ${moneda}`,
-                                "Liquidez real menos deuda pendiente"
-                            )}
-                        </dl>
-                    </section>
+                            <dl className="grid gap-5 grid-cols-1">
+                                {fila(
+                                    "Promedio de gasto diario",
+                                    `${formatearMonto(promedioDiario, moneda)} ${moneda}`,
+                                    `${dias} ${dias === 1 ? "día" : "días"} en el periodo`
+                                )}
 
-                    {/* Gráficos (el orden final lo definimos en el Módulo 4) */}
-                    <EvolucionChart datos={serie} moneda={moneda} />
+                                {fila(
+                                    "Ratio de endeudamiento",
+                                    endeudamiento === null
+                                        ? "—"
+                                        : formatearPorcentaje(endeudamiento),
+                                    endeudamiento === null
+                                        ? "Sin ingresos en el periodo para comparar"
+                                        : `Deuda en tarjetas sobre un ingreso promedio de ${formatearMonto(ingresoPromedioMensual, moneda)} ${moneda} al mes`
+                                )}
 
-                    <ComposicionGastoChart
-                        porciones={porciones}
-                        total={egresos}
-                        moneda={moneda}
-                    />
+                                {fila(
+                                    "Deuda pendiente en tarjetas",
+                                    `${formatearMonto(deudaTarjetas, moneda)} ${moneda}`,
+                                    "Cuotas pendientes hoy"
+                                )}
 
-                    <RitmoGastoChart movimientos={contables} moneda={moneda} />
+                                {fila(
+                                    "Posición neta",
+                                    `${formatearMonto(posicionNeta, moneda)} ${moneda}`,
+                                    "Liquidez real menos deuda pendiente"
+                                )}
+                            </dl>
+                        </section>
+                    </div>
 
+                    {/* Fila 4: tabla desplegable */}
                     <TablaMensual datos={serie} moneda={moneda} />
                 </>
             )}
