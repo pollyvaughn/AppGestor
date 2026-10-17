@@ -164,7 +164,8 @@ CREATE TABLE movimiento (
         'EGRESO',
         'TRANSFERENCIA',
         'PAGO_TARJETA',
-        'AJUSTE'
+        'AJUSTE',
+        'SALDO_INICIAL'
     ) NOT NULL,
 
     estado ENUM(

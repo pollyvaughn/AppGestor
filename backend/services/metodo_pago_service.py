@@ -8,6 +8,8 @@ def crear_metodo_pago(metodo, usuario_id):
     try:
         cursor = conexion.cursor()
 
+        conexion.start_transaction()
+
         sql = """
             INSERT INTO metodo_pago
             (usuario_id, tipo, nombre, moneda, estado, saldo)
@@ -23,9 +25,56 @@ def crear_metodo_pago(metodo, usuario_id):
         )
 
         cursor.execute(sql, valores)
+
+        metodo_id = cursor.lastrowid
+
+        # Una cuenta que nace con plata registra ese saldo como un
+        # movimiento SALDO_INICIAL. No pasa por actualizar_saldo porque
+        # el saldo ya quedó guardado en el INSERT de arriba (si no, se
+        # sumaría dos veces). Tampoco cuenta como ingreso en los reportes.
+        if metodo.tipo != "TARJETA_CREDITO" and metodo.saldo > 0:
+            cursor.execute(
+                """
+                INSERT INTO movimiento
+                (
+                    usuario_id,
+                    categoria_id,
+                    metodo_pago_id,
+                    tipo,
+                    estado,
+                    descripcion,
+                    monto,
+                    moneda,
+                    fecha
+                )
+                VALUES (
+                    %s,
+                    NULL,
+                    %s,
+                    'SALDO_INICIAL',
+                    'CONFIRMADO',
+                    %s,
+                    %s,
+                    %s,
+                    NOW()
+                )
+                """,
+                (
+                    usuario_id,
+                    metodo_id,
+                    "Saldo inicial",
+                    metodo.saldo,
+                    metodo.moneda
+                )
+            )
+
         conexion.commit()
 
-        return cursor.lastrowid
+        return metodo_id
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()
@@ -59,6 +108,10 @@ def editar_metodo_pago(metodo_id, metodo, usuario_id):
     conexion = get_connection()
 
     try:
+        # Antes faltaba esta línea: el cursor nunca se creaba y
+        # editar una cuenta fallaba con NameError.
+        cursor = conexion.cursor()
+
         sql = """
             UPDATE metodo_pago
             SET tipo = %s,
@@ -83,6 +136,10 @@ def editar_metodo_pago(metodo_id, metodo, usuario_id):
         conexion.commit()
 
         return cursor.rowcount
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()

@@ -84,6 +84,7 @@ const ETIQUETA_TIPO: Record<string, string> = {
     TRANSFERENCIA: "Transferencia",
     PAGO_TARJETA: "Pago de tarjeta",
     AJUSTE: "Ajuste",
+    SALDO_INICIAL: "Saldo inicial",
 }
 
 const estiloCard = {

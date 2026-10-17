@@ -4,7 +4,13 @@ export type Movimiento = {
     categoria: string | null
     metodo_pago_id: number | null
     metodo_pago: string | null
-    tipo: "INGRESO" | "EGRESO" | "TRANSFERENCIA" | "PAGO_TARJETA" | "AJUSTE"
+    tipo:
+        | "INGRESO"
+        | "EGRESO"
+        | "TRANSFERENCIA"
+        | "PAGO_TARJETA"
+        | "AJUSTE"
+        | "SALDO_INICIAL"
     estado: "PENDIENTE" | "CONFIRMADO" | "ANULADO"
     descripcion: string | null
     monto: number
@@ -40,7 +46,9 @@ export function nombreMes(mes: string) {
     return `${MESES[numero - 1]} ${anio}`
 }
 
-// Solo lo que cuenta para ingresos y gastos
+// Solo lo que cuenta para ingresos y gastos del periodo.
+// Quedan afuera SALDO_INICIAL, TRANSFERENCIA, PAGO_TARJETA y AJUSTE:
+// no son plata ganada ni gastada, solo mueven o ajustan saldos.
 export function esContable(m: Movimiento) {
     return (
         m.estado === "CONFIRMADO" &&
@@ -50,6 +58,8 @@ export function esContable(m: Movimiento) {
 
 export type Totales = { ingresos: number; egresos: number }
 
+// Ingresos y gastos del periodo por moneda (usa esContable).
+// Flujo neto = ingresos - egresos (ver flujoNeto).
 export function totalesPorMoneda(lista: Movimiento[]) {
     const resultado: Record<string, Totales> = {}
 
@@ -65,6 +75,34 @@ export function totalesPorMoneda(lista: Movimiento[]) {
         } else {
             resultado[m.moneda].egresos += Number(m.monto)
         }
+    }
+
+    return resultado
+}
+
+// Resultado operacional del periodo: ingresos - egresos
+export function flujoNeto(totales: Totales) {
+    return totales.ingresos - totales.egresos
+}
+
+export type CuentaConSaldo = {
+    tipo: string
+    moneda: string
+    saldo: number
+}
+
+// Disponible real / patrimonio: suma de los saldos actuales de las cuentas
+// de dinero, por moneda. El saldo ya incluye saldo inicial + ingresos - gastos.
+// Las tarjetas de crédito no suman: su deuda se ve aparte.
+// listarCuentas() solo devuelve cuentas activas.
+export function patrimonioPorMoneda(cuentas: CuentaConSaldo[]) {
+    const resultado: Record<string, number> = {}
+
+    for (const cuenta of cuentas) {
+        if (cuenta.tipo === "TARJETA_CREDITO") continue
+
+        resultado[cuenta.moneda] =
+            (resultado[cuenta.moneda] ?? 0) + Number(cuenta.saldo)
     }
 
     return resultado
