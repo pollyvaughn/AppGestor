@@ -13,6 +13,7 @@ from backend.routes import pagos
 from backend.routes.recurrentes import router as recurrentes_router
 from backend.routes.cuota import router as cuota_router
 from backend.routes.ajustes import router as ajustes_router
+from backend.routes.presupuestos import router as presupuestos_router
 
 app = FastAPI(title="Finanzas API")
 
@@ -37,6 +38,7 @@ app.include_router(pagos.router)
 app.include_router(recurrentes_router)
 app.include_router(ajustes_router)
 app.include_router(cuota_router)
+app.include_router(presupuestos_router)
 
 app.include_router(usuarios_router)
 

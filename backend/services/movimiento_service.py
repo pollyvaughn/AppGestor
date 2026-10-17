@@ -195,9 +195,8 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
         if not movimiento_actual:
             return False, "Movimiento no encontrado"
 
-        if movimiento_actual["tipo"] == "SALDO_INICIAL":
-            return False, "El saldo inicial no se puede editar"
-
+        if movimiento_actual["tipo"] in ("SALDO_INICIAL", "AJUSTE", "PAGO_TARJETA"):
+            return False, "Este movimiento lo genera el sistema y no se puede editar"
         # Verificar categoría
         if movimiento.categoria_id is not None:
             cursor.execute(
@@ -335,12 +334,11 @@ def eliminar_movimiento(movimiento_id, usuario_id):
         if not movimiento:
             return 0
 
-        if movimiento["tipo"] == "SALDO_INICIAL":
+        if movimiento["tipo"] in ("SALDO_INICIAL", "AJUSTE", "PAGO_TARJETA"):
             raise HTTPException(
                 status_code=400,
-                detail="El saldo inicial no se puede anular"
+                detail="Este movimiento lo genera el sistema y no se puede anular desde acá"
             )
-
         # Revertir efecto del movimiento
         if movimiento["metodo_pago_id"] is not None:
             revertir_saldo(

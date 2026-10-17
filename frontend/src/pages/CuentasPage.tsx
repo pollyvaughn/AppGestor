@@ -314,6 +314,7 @@ export default function CuentasPage() {
                             id="moneda"
                             label="Moneda"
                             value={formulario.moneda}
+                            disabled={editando !== null}
                             onChange={function (e) {
                                 const moneda = e.target.value
 

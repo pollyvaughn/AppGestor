@@ -11,7 +11,6 @@ import {
 import { type Movimiento, mesActual, nombreMes } from "../../lib/movimientos"
 import { formatearMonto } from "../../lib/moneda"
 import { formatoCompacto, serieRitmo } from "../../lib/graficos"
-import { guardarTope, leerTope } from "../../lib/tope"
 import { formatearPorcentaje } from "../../lib/resumen"
 import Button from "../ui/Button"
 import MontoInput from "../ui/MontoInput"
@@ -33,23 +32,26 @@ type RitmoGastoChartProps = {
     // movimientos contables de todas las monedas (se filtra por moneda acá)
     movimientos: Movimiento[]
     moneda: string
+    // tope mensual de esta moneda (null = sin tope definido)
+    tope: number | null
+    onGuardarTope: (valor: number) => Promise<void>
+    onQuitarTope: () => Promise<void>
 }
 
 export default function RitmoGastoChart({
     movimientos,
     moneda,
+    tope,
+    onGuardarTope,
+    onQuitarTope,
 }: RitmoGastoChartProps) {
-    const [tope, setTope] = useState<number | null>(function () {
-        return leerTope(moneda)
-    })
     const [borrador, setBorrador] = useState("")
     const [editando, setEditando] = useState(false)
     const [error, setError] = useState("")
 
-    // cada moneda tiene su propio tope
+    // al cambiar de moneda se cierra el formulario
     useEffect(
         function () {
-            setTope(leerTope(moneda))
             setEditando(false)
             setError("")
         },
@@ -68,7 +70,7 @@ export default function RitmoGastoChart({
         setEditando(true)
     }
 
-    function guardar(evento: React.FormEvent<HTMLFormElement>) {
+    async function guardar(evento: React.FormEvent<HTMLFormElement>) {
         evento.preventDefault()
 
         const valor = Number(borrador)
@@ -78,18 +80,28 @@ export default function RitmoGastoChart({
             return
         }
 
-        guardarTope(moneda, valor)
-        setTope(valor)
-        setEditando(false)
-        setError("")
+        try {
+            await onGuardarTope(valor)
+            setEditando(false)
+            setError("")
+        } catch (e) {
+            setError(
+                e instanceof Error ? e.message : "No se pudo guardar el tope"
+            )
+        }
     }
 
-    function quitar() {
-        guardarTope(moneda, null)
-        setTope(null)
-        setBorrador("")
-        setEditando(false)
-        setError("")
+    async function quitar() {
+        try {
+            await onQuitarTope()
+            setBorrador("")
+            setEditando(false)
+            setError("")
+        } catch (e) {
+            setError(
+                e instanceof Error ? e.message : "No se pudo quitar el tope"
+            )
+        }
     }
 
     const marcas = [1, 5, 10, 15, 20, 25, ritmo.diasMes]

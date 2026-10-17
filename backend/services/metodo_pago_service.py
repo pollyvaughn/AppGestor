@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from backend.database import get_connection
 from fastapi import HTTPException
 
@@ -108,9 +110,60 @@ def editar_metodo_pago(metodo_id, metodo, usuario_id):
     conexion = get_connection()
 
     try:
-        # Antes faltaba esta línea: el cursor nunca se creaba y
-        # editar una cuenta fallaba con NameError.
-        cursor = conexion.cursor()
+        cursor = conexion.cursor(dictionary=True)
+
+        conexion.start_transaction()
+
+        cursor.execute(
+            """
+            SELECT tipo, moneda, saldo
+            FROM metodo_pago
+            WHERE id = %s
+            AND usuario_id = %s
+            AND estado = 'ACTIVO'
+            FOR UPDATE
+            """,
+            (metodo_id, usuario_id)
+        )
+
+        actual = cursor.fetchone()
+
+        if not actual:
+            return 0
+
+        # Cambiar la moneda de una cuenta con movimientos dejaría el
+        # historial en una moneda distinta a la de la cuenta.
+        if metodo.moneda != actual["moneda"]:
+            cursor.execute(
+                """
+                SELECT id
+                FROM movimiento
+                WHERE metodo_pago_id = %s
+                LIMIT 1
+                """,
+                (metodo_id,)
+            )
+
+            tiene_movimientos = cursor.fetchone()
+
+            if not tiene_movimientos:
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM movimiento_metodo
+                    WHERE metodo_pago_id = %s
+                    LIMIT 1
+                    """,
+                    (metodo_id,)
+                )
+
+                tiene_movimientos = cursor.fetchone()
+
+            if tiene_movimientos:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se puede cambiar la moneda de una cuenta que ya tiene movimientos"
+                )
 
         sql = """
             UPDATE metodo_pago
@@ -133,9 +186,55 @@ def editar_metodo_pago(metodo_id, metodo, usuario_id):
         )
 
         cursor.execute(sql, valores)
+
+        # Si el saldo cambió a mano, queda registrado como un ajuste
+        # (no cuenta como ingreso ni gasto). El monto es la diferencia
+        # en positivo; el sentido se lee en la descripción.
+        saldo_anterior = actual["saldo"]
+        saldo_nuevo = Decimal(str(metodo.saldo)).quantize(Decimal("0.01"))
+        diferencia = saldo_nuevo - saldo_anterior
+
+        if diferencia != 0 and actual["tipo"] != "TARJETA_CREDITO":
+            cursor.execute(
+                """
+                INSERT INTO movimiento
+                (
+                    usuario_id,
+                    categoria_id,
+                    metodo_pago_id,
+                    tipo,
+                    estado,
+                    descripcion,
+                    monto,
+                    moneda,
+                    fecha
+                )
+                VALUES (
+                    %s,
+                    NULL,
+                    %s,
+                    'AJUSTE',
+                    'CONFIRMADO',
+                    %s,
+                    %s,
+                    %s,
+                    NOW()
+                )
+                """,
+                (
+                    usuario_id,
+                    metodo_id,
+                    f"Ajuste de saldo: de {saldo_anterior} a {saldo_nuevo}",
+                    abs(diferencia),
+                    metodo.moneda
+                )
+            )
+
         conexion.commit()
 
-        return cursor.rowcount
+        # Siempre 1: la cuenta existe aunque no haya cambiado nada
+        # (rowcount valdría 0 y la ruta diría "no encontrado").
+        return 1
 
     except Exception:
         conexion.rollback()

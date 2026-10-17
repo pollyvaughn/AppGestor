@@ -100,9 +100,9 @@ export function serieMensual(
     return puntos
 }
 
-// ---------- Composición del gasto ----------
+// ---------- Composición por categoría (gastos o ingresos) ----------
 
-export type PorcionGasto = {
+export type PorcionCategoria = {
     clave: string
     nombre: string
     total: number
@@ -111,11 +111,12 @@ export type PorcionGasto = {
     fill: string
 }
 
-export function composicionGastos(
+export function composicionPorCategoria(
     lista: Movimiento[],
     moneda: string,
-    colores: Record<number, string>
-): PorcionGasto[] {
+    colores: Record<number, string>,
+    tipo: "INGRESO" | "EGRESO"
+): PorcionCategoria[] {
     const grupos: Record<
         string,
         { clave: string; nombre: string; total: number; fill: string }
@@ -123,7 +124,7 @@ export function composicionGastos(
     let suma = 0
 
     for (const m of lista) {
-        if (m.tipo !== "EGRESO" || m.moneda !== moneda) {
+        if (m.tipo !== tipo || m.moneda !== moneda) {
             continue
         }
 

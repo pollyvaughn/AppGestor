@@ -4,6 +4,11 @@ import { listarCuentas } from "../services/cuentaService"
 import { listarTarjetas } from "../services/tarjetaService"
 import { listarCategorias } from "../services/categoriaService"
 import {
+    guardarPresupuesto,
+    listarPresupuestos,
+    quitarPresupuesto,
+} from "../services/presupuestoService"
+import {
     type Movimiento,
     esContable,
     flujoNeto,
@@ -26,7 +31,7 @@ import {
     tasaAhorro,
     variacionPorcentual,
 } from "../lib/resumen"
-import { composicionGastos, serieMensual } from "../lib/graficos"
+import { composicionPorCategoria, serieMensual } from "../lib/graficos"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
@@ -75,6 +80,7 @@ export default function GlobalPage() {
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
+    const [topes, setTopes] = useState<Record<string, number>>({})
     const [monedaElegida, setMonedaElegida] = useState("")
     const [periodoClave, setPeriodoClave] = useState<ClavePeriodo>("mes")
     const [cargando, setCargando] = useState(true)
@@ -82,16 +88,28 @@ export default function GlobalPage() {
 
     async function cargar() {
         try {
-            const [movs, ctas, tjs, cats] = await Promise.all([
+            const [movs, ctas, tjs, cats, presupuestos] = await Promise.all([
                 listarMovimientos(),
                 listarCuentas(),
                 listarTarjetas(),
                 listarCategorias(),
+                // si falla (ej. falta la migración) la página sigue sin topes
+                listarPresupuestos().catch(function () {
+                    return []
+                }),
             ])
             setMovimientos(movs)
             setCuentas(ctas)
             setTarjetas(tjs)
             setCategorias(cats)
+
+            const mapa: Record<string, number> = {}
+
+            for (const presupuesto of presupuestos) {
+                mapa[presupuesto.moneda] = Number(presupuesto.tope_mensual)
+            }
+
+            setTopes(mapa)
         } catch (e) {
             setError(
                 e instanceof Error
@@ -191,7 +209,32 @@ export default function GlobalPage() {
         }
     }
 
-    const porciones = composicionGastos(delPeriodo, moneda, colores)
+    const porcionesGasto = composicionPorCategoria(
+        delPeriodo,
+        moneda,
+        colores,
+        "EGRESO"
+    )
+    const porcionesIngreso = composicionPorCategoria(
+        delPeriodo,
+        moneda,
+        colores,
+        "INGRESO"
+    )
+
+    // Tope mensual de la moneda elegida
+    async function guardarTope(valor: number) {
+        await guardarPresupuesto(moneda, valor)
+        setTopes({ ...topes, [moneda]: valor })
+    }
+
+    async function quitarTope() {
+        await quitarPresupuesto(moneda)
+
+        const copia = { ...topes }
+        delete copia[moneda]
+        setTopes(copia)
+    }
 
     // Fila de una métrica secundaria
     function fila(titulo: string, valor: string, detalle: string) {
@@ -362,8 +405,10 @@ export default function GlobalPage() {
                         <EvolucionChart datos={serie} moneda={moneda} />
 
                         <ComposicionGastoChart
-                            porciones={porciones}
-                            total={egresos}
+                            gastos={porcionesGasto}
+                            ingresos={porcionesIngreso}
+                            totalGastos={egresos}
+                            totalIngresos={ingresos}
                             moneda={moneda}
                         />
                     </div>
@@ -373,6 +418,9 @@ export default function GlobalPage() {
                         <RitmoGastoChart
                             movimientos={contables}
                             moneda={moneda}
+                            tope={topes[moneda] ?? null}
+                            onGuardarTope={guardarTope}
+                            onQuitarTope={quitarTope}
                         />
 
                         <section className="p-4 sm:p-6" style={estiloCard}>

@@ -1,7 +1,9 @@
+import { useState } from "react"
 import { Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { formatearMonto } from "../../lib/moneda"
-import { type PorcionGasto } from "../../lib/graficos"
+import { type PorcionCategoria } from "../../lib/graficos"
 import { formatearPorcentaje } from "../../lib/resumen"
+import Button from "../ui/Button"
 import EstadoVacio from "../ui/EstadoVacio"
 
 const estiloCard = {
@@ -10,31 +12,81 @@ const estiloCard = {
     borderRadius: "var(--radius-lg)",
 }
 
+type Modo = "EGRESO" | "INGRESO"
+
+const OPCIONES: { key: Modo; label: string }[] = [
+    { key: "EGRESO", label: "Gastos" },
+    { key: "INGRESO", label: "Ingresos" },
+]
+
 type ComposicionGastoChartProps = {
-    porciones: PorcionGasto[]
-    total: number
+    gastos: PorcionCategoria[]
+    ingresos: PorcionCategoria[]
+    totalGastos: number
+    totalIngresos: number
     moneda: string
 }
 
 export default function ComposicionGastoChart({
-    porciones,
-    total,
+    gastos,
+    ingresos,
+    totalGastos,
+    totalIngresos,
     moneda,
 }: ComposicionGastoChartProps) {
+    const [modo, setModo] = useState<Modo>("EGRESO")
+
+    const esGasto = modo === "EGRESO"
+    const porciones = esGasto ? gastos : ingresos
+    const total = esGasto ? totalGastos : totalIngresos
+
     return (
         <section className="p-4 sm:p-6" style={estiloCard}>
-            <h2
-                className="text-xs mb-5"
-                style={{
-                    color: "var(--color-muted-foreground)",
-                    fontFamily: "var(--font-mono)",
-                }}
-            >
-                Composición del gasto
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                <h2
+                    className="text-xs"
+                    style={{
+                        color: "var(--color-muted-foreground)",
+                        fontFamily: "var(--font-mono)",
+                    }}
+                >
+                    {esGasto ? "Composición del gasto" : "Composición del ingreso"}
+                </h2>
+
+                <div
+                    role="group"
+                    aria-label="Tipo de movimiento"
+                    className="flex gap-2"
+                >
+                    {OPCIONES.map(function (opcion) {
+                        const activo = opcion.key === modo
+
+                        return (
+                            <Button
+                                key={opcion.key}
+                                type="button"
+                                variant={activo ? "primary" : "secondary"}
+                                aria-pressed={activo}
+                                className="!py-1 !text-xs"
+                                onClick={function () {
+                                    setModo(opcion.key)
+                                }}
+                            >
+                                {opcion.label}
+                            </Button>
+                        )
+                    })}
+                </div>
+            </div>
 
             {porciones.length === 0 ? (
-                <EstadoVacio texto="Sin gastos en este periodo." />
+                <EstadoVacio
+                    texto={
+                        esGasto
+                            ? "Sin gastos en este periodo."
+                            : "Sin ingresos en este periodo."
+                    }
+                />
             ) : (
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 items-center">
                     <div className="relative" style={{ height: 220 }}>
