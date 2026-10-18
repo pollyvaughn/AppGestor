@@ -99,3 +99,22 @@ export function puedePagarCuota(cuotas: Cuota[], cuota: Cuota) {
         )
     })
 }
+
+export type LineaResumen = {
+    cuota_id: number
+    numero: number
+    cantidad_cuotas: number
+    descripcion: string | null
+    monto_base: number
+    monto_pendiente: number
+    estado: string
+}
+
+export type Resumen = {
+    periodo: string
+    fecha_vencimiento: string | null
+    total_pendiente: number
+    pago_minimo: number | null
+    puede_pagar: boolean
+    lineas: LineaResumen[]
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import TarjetasPage from "./TarjetasPage"
+import ResumenesTarjeta from "./ResumenesTarjeta"
 import ComprasTarjetaPage from "./ComprasTarjetaPage"
 import { listarTarjetas } from "../services/tarjetaService"
 
@@ -19,6 +20,7 @@ export default function TarjetasYComprasPage({
 }: TarjetasYComprasPageProps) {
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
     const [version, setVersion] = useState(0)
+    const [versionCompras, setVersionCompras] = useState(0)
 
     async function cargarTarjetas() {
         try {
@@ -36,6 +38,14 @@ export default function TarjetasYComprasPage({
         cargarTarjetas()
     }
 
+    // pagar un resumen cambia cuotas de varias compras: se recarga la lista
+    function alPagarResumen() {
+        setVersionCompras(function (v) {
+            return v + 1
+        })
+        refrescarTodo()
+    }
+
     useEffect(function () {
         cargarTarjetas()
     }, [])
@@ -44,7 +54,14 @@ export default function TarjetasYComprasPage({
         <div className="space-y-10">
             <TarjetasPage key={version} onCambio={cargarTarjetas} />
 
+            <ResumenesTarjeta
+                tarjetas={tarjetas}
+                version={version}
+                onCambio={alPagarResumen}
+            />
+
             <ComprasTarjetaPage
+                key={versionCompras}
                 tarjetas={tarjetas}
                 onCambio={refrescarTodo}
                 onIrACategorias={onIrACategorias}
