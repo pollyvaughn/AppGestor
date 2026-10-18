@@ -1,5 +1,5 @@
 from pwdlib import PasswordHash
-
+from backend.services.categoria_service import crear_categorias_por_defecto
 from backend.database import get_connection
 
 
@@ -14,14 +14,12 @@ def crear_usuario(usuario):
 
         password_encriptada = password_hasher.hash(usuario.password)
 
-        sql = """
+        cursor.execute(
+            """
             INSERT INTO usuario
             (nombre, email, password, estado)
             VALUES (%s, %s, %s, 'ACTIVO')
-        """
-
-        cursor.execute(
-            sql,
+            """,
             (
                 usuario.nombre,
                 usuario.email,
@@ -29,14 +27,21 @@ def crear_usuario(usuario):
             )
         )
 
+        usuario_id = cursor.lastrowid
+
+        crear_categorias_por_defecto(cursor, usuario_id)
+
         conexion.commit()
 
-        return cursor.lastrowid
+        return usuario_id
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()
         conexion.close()
-
 
 def obtener_usuario(usuario_id):
     conexion = get_connection()

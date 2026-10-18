@@ -190,8 +190,7 @@ crear una cuenta e ingresar su saldo actual. Ese saldo es el punto de partida:
 se registra como un movimiento **"Saldo inicial"** que **no cuenta como
 ingreso**.
 
-Antes de registrar movimientos hay que crear al menos una categoría de ingreso
-y otra de egreso desde **Categorías**. La categoría y la cuenta son
+Al registrarte se crean categorías básicas (Salario, Comida, Transporte...) que podés editar o borrar desde Categorías. La categoría y la cuenta son
 obligatorias para ingresos y egresos. Las compras con tarjeta se registran
 desde **Tarjetas**.
 

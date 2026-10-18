@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef } from "react"
 
+// Modales abiertos, del más viejo al más nuevo: Escape cierra solo el de arriba
+const pila: string[] = []
+
 type ModalProps = {
     open: boolean
     title: string
@@ -24,10 +27,37 @@ export default function Modal({
                 return
             }
 
-            function alPresionar(e: KeyboardEvent) {
-                if (e.key === "Escape") {
-                    onClose()
+            pila.push(tituloId)
+
+            return function () {
+                const indice = pila.indexOf(tituloId)
+
+                if (indice !== -1) {
+                    pila.splice(indice, 1)
                 }
+            }
+        },
+        [open, tituloId]
+    )
+
+    useEffect(
+        function () {
+            if (!open) {
+                return
+            }
+
+            function alPresionar(e: KeyboardEvent) {
+                if (e.key !== "Escape" || e.defaultPrevented) {
+                    return
+                }
+
+                if (pila[pila.length - 1] !== tituloId) {
+                    return
+                }
+
+                // marca el evento como atendido para que el modal de abajo lo ignore
+                e.preventDefault()
+                onClose()
             }
 
             document.addEventListener("keydown", alPresionar)
@@ -36,7 +66,7 @@ export default function Modal({
                 document.removeEventListener("keydown", alPresionar)
             }
         },
-        [open, onClose]
+        [open, onClose, tituloId]
     )
 
     useEffect(

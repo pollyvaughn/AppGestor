@@ -1,5 +1,31 @@
 from backend.database import get_connection
 
+CATEGORIAS_POR_DEFECTO = [
+    ("Salario", "INGRESO", "#2A6049"),
+    ("Trabajo freelance", "INGRESO", "#4A8A7A"),
+    ("Otros ingresos", "INGRESO", "#7A7873"),
+    ("Comida", "EGRESO", "#A86B3B"),
+    ("Transporte", "EGRESO", "#3B6EA8"),
+    ("Servicios", "EGRESO", "#5A6EA8"),
+    ("Hogar", "EGRESO", "#B07840"),
+    ("Salud", "EGRESO", "#4A8A7A"),
+    ("Ocio", "EGRESO", "#7B5EA7"),
+    ("Otros gastos", "EGRESO", "#7A7873"),
+]
+
+
+def crear_categorias_por_defecto(cursor, usuario_id):
+    cursor.executemany(
+        """
+        INSERT INTO categoria
+        (usuario_id, nombre, tipo, color, estado)
+        VALUES (%s, %s, %s, %s, TRUE)
+        """,
+        [
+            (usuario_id, nombre, tipo, color)
+            for nombre, tipo, color in CATEGORIAS_POR_DEFECTO
+        ]
+    )
 
 def crear_categoria(categoria, usuario_id):
     conexion = get_connection()

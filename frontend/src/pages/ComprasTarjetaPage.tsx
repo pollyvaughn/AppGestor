@@ -18,7 +18,6 @@ import Select from "../components/ui/Select"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
-import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 import { formatearMonto } from "../lib/moneda"
 import CuotaFila from "./CuotaFila"
 import PagoCuotaModal from "./PagoCuotaModal"
@@ -32,6 +31,7 @@ import {
 } from "./utilTarjetas"
 
 import { fechaHoy } from "../lib/fechas"
+import CategoriaRapida from "../components/ui/CategoriaRapida"
 
 type Tarjeta = {
     id: number
@@ -44,6 +44,7 @@ type Categoria = {
     id: number
     nombre: string
     tipo: "INGRESO" | "EGRESO"
+    color: string | null
 }
 
 type Compra = {
@@ -56,6 +57,7 @@ type Compra = {
     descripcion: string | null
     categoria_id: number | null
     categoria: string | null
+    categoria_color: string | null
 }
 
 type Formulario = {
@@ -86,14 +88,6 @@ type ComprasTarjetaPageProps = {
     // se llama cuando cambia la deuda de las tarjetas (compra, pago, ajuste...)
     onCambio?: () => void
     onIrACategorias: () => void
-}
-
-const formularioInicial: Formulario = {
-    tarjetaId: "",
-    categoriaId: "",
-    monto: "",
-    cuotas: "1",
-    descripcion: "",
 }
 
 export default function ComprasTarjetaPage({
@@ -509,6 +503,21 @@ export default function ComprasTarjetaPage({
         }
     }
 
+    async function categoriaCreada(id: number) {
+        try {
+            setCategorias(await listarCategorias())
+            setFormulario(function (anterior) {
+                return { ...anterior, categoriaId: String(id) }
+            })
+        } catch (e) {
+            setErrorModal(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudieron recargar las categorías"
+            )
+        }
+    }
+
     // ---------- Pantalla ----------
 
     return (
@@ -559,20 +568,45 @@ export default function ComprasTarjetaPage({
                                             "Compra sin descripción"}
                                     </p>
 
-                                    <p
-                                        className="text-xs"
+                                    <div
+                                        className="flex items-center gap-1.5 text-xs"
+                                        style={{
+                                            color: compra.categoria
+                                                ? "var(--color-foreground)"
+                                                : "var(--color-muted-foreground)",
+                                        }}
+                                    >
+                                        {compra.categoria && (
+                                            <span
+                                                className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                                                style={{
+                                                    background:
+                                                        compra.categoria_color ??
+                                                        "var(--color-muted-foreground)",
+                                                }}
+                                                aria-hidden="true"
+                                            />
+                                        )}
+                                        {compra.categoria ?? "Sin categoría"}
+                                    </div>
+
+                                    <div
+                                        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
                                         style={{
                                             color: "var(--color-muted-foreground)",
                                         }}
                                     >
-                                        {compra.tarjeta} ·{" "}
-                                        {fechaCorta(compra.fecha_compra)} ·{" "}
-                                        {compra.categoria ?? "Sin categoría"} ·{" "}
-                                        {compra.cantidad_cuotas}{" "}
-                                        {compra.cantidad_cuotas === 1
-                                            ? "cuota"
-                                            : "cuotas"}
-                                    </p>
+                                        <span>
+                                            {compra.tarjeta} ·{" "}
+                                            {fechaCorta(compra.fecha_compra)}
+                                        </span>
+                                        <span>
+                                            {compra.cantidad_cuotas}{" "}
+                                            {compra.cantidad_cuotas === 1
+                                                ? "cuota"
+                                                : "cuotas"}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <p
@@ -749,7 +783,10 @@ export default function ComprasTarjetaPage({
                             })}
                     </Select>
                     <div className="flex justify-end">
-                        <CategoriaShortcut onClick={onIrACategorias} />
+                        <CategoriaRapida
+                            tipo="EGRESO"
+                            onCreada={categoriaCreada}
+                        />
                     </div>
                     {categorias.every(function (categoria) {
                         return categoria.tipo !== "EGRESO"
@@ -758,7 +795,7 @@ export default function ComprasTarjetaPage({
                             className="text-xs"
                             style={{ color: "var(--color-muted-foreground)" }}
                         >
-                            Creá primero una categoría de egreso en Categorías.
+                            Todavía no tenés categorías de egreso: creá una con "Crear categoría".
                         </p>
                     )}
 

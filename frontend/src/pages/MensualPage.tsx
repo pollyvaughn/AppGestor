@@ -30,6 +30,7 @@ import { avisoSaldo } from "../lib/saldo"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
 
 import TransferenciaModal from "../components/movimientos/TransferenciaModal"
+import CategoriaRapida from "../components/ui/CategoriaRapida"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -533,6 +534,22 @@ export default function MensualPage({
             nombre: categoria.nombre,
         })
         setFiltro(tipo)
+    }
+
+    // la categoría recién creada queda elegida en el formulario
+    async function categoriaCreada(id: number) {
+        try {
+            setCategorias(await listarCategorias())
+            setFormulario(function (anterior) {
+                return { ...anterior, categoriaId: String(id) }
+            })
+        } catch (e) {
+            setError(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudieron recargar las categorías"
+            )
+        }
     }
 
     // ---------- Pantalla ----------
@@ -1293,7 +1310,10 @@ export default function MensualPage({
                         })}
                     </Select>
                     <div className="flex justify-end">
-                        <CategoriaShortcut onClick={onIrACategorias} />
+                        <CategoriaRapida
+                            tipo={formulario.tipo}
+                            onCreada={categoriaCreada}
+                        />
                     </div>
 
                     <Select

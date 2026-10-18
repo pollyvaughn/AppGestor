@@ -147,8 +147,7 @@ export default function ConfiguracionInicialPage({
                         className="text-xs"
                         style={{ color: "var(--color-muted-foreground)" }}
                     >
-                        Después, creá al menos una categoría de ingreso y una de
-                        egreso desde Categorías para poder registrar movimientos.
+                        Ya tenés categorías básicas listas. Podés editarlas o crear más desde Categorías.
                     </p>
 
                     {error && <Mensaje tipo="error">{error}</Mensaje>}

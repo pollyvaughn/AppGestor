@@ -296,7 +296,8 @@ def listar_compras(usuario_id):
                 ct.fecha_compra,
                 m.descripcion,
                 m.categoria_id,
-                c.nombre AS categoria
+                c.nombre AS categoria,
+                c.color AS categoria_color
             FROM compra_tarjeta ct
             INNER JOIN tarjeta_credito tc
                 ON ct.tarjeta_id = tc.id

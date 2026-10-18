@@ -16,9 +16,9 @@ import Select from "../components/ui/Select"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
-import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 import { formatearMonto } from "../lib/moneda"
 import { avisoSaldo } from "../lib/saldo"
+import CategoriaRapida from "../components/ui/CategoriaRapida"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -378,7 +378,20 @@ export default function RecurrentesPage({
         }
     }
 
-    // ---------- Datos calculados ----------
+    async function categoriaCreada(id: number) {
+        try {
+            setCategorias(await listarCategorias())
+            setFormulario(function (anterior) {
+                return { ...anterior, categoriaId: String(id) }
+            })
+        } catch (e) {
+            setErrorModal(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudieron recargar las categorías"
+            )
+        }
+    }
 
     // ---------- Datos calculados ----------
 
@@ -621,7 +634,10 @@ export default function RecurrentesPage({
                         })}
                     </Select>
                     <div className="flex justify-end">
-                        <CategoriaShortcut onClick={onIrACategorias} />
+                        <CategoriaRapida
+                            tipo={formulario.tipo}
+                            onCreada={categoriaCreada}
+                        />
                     </div>
 
                     <Select
