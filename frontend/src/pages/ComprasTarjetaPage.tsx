@@ -28,8 +28,7 @@ import {
     type Pago,
     fechaCorta,
     puedePagarCuota,
-} from "./utilTarjetas"
-
+} from "../lib/tarjetas"
 import { fechaHoy } from "../lib/fechas"
 import CategoriaRapida from "../components/ui/CategoriaRapida"
 
@@ -87,13 +86,11 @@ type ComprasTarjetaPageProps = {
     tarjetas: Tarjeta[]
     // se llama cuando cambia la deuda de las tarjetas (compra, pago, ajuste...)
     onCambio?: () => void
-    onIrACategorias: () => void
 }
 
 export default function ComprasTarjetaPage({
     tarjetas,
     onCambio,
-    onIrACategorias,
 }: ComprasTarjetaPageProps) {
     const [compras, setCompras] = useState<Compra[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])

@@ -18,13 +18,7 @@ const PESTANAS: { key: Pestana; label: string }[] = [
     { key: "compras", label: "Compras con tarjeta" },
 ]
 
-type TarjetasYComprasPageProps = {
-    onIrACategorias: () => void
-}
-
-export default function TarjetasYComprasPage({
-    onIrACategorias,
-}: TarjetasYComprasPageProps) {
+export default function TarjetasYComprasPage() {
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
     const [version, setVersion] = useState(0)
     const [versionCompras, setVersionCompras] = useState(0)
@@ -126,7 +120,6 @@ export default function TarjetasYComprasPage({
                         key={versionCompras}
                         tarjetas={tarjetas}
                         onCambio={refrescarTodo}
-                        onIrACategorias={onIrACategorias}
                     />
                 </div>
             </div>

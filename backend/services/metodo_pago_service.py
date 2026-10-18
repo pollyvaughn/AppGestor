@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from backend.database import get_connection
 from fastapi import HTTPException
 

@@ -19,7 +19,6 @@ import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
-import { avisoSaldo } from "../lib/saldo"
 import TransferenciaModal from "../components/movimientos/TransferenciaModal"
 import MovimientoModal from "../components/movimientos/MovimientoModal"
 
@@ -51,7 +50,6 @@ type Cuenta = { id: number; nombre: string; tipo: string; moneda: string; saldo:
 type MensualPageProps = {
     version?: number
     onIrATarjetas: () => void
-    onIrACategorias: () => void
 }
 
 const COLOR_POR_DEFECTO = "#7A7873"
@@ -98,7 +96,6 @@ function textoOperaciones(cantidad: number) {
 export default function MensualPage({
     version = 0,
     onIrATarjetas,
-    onIrACategorias,
 }: MensualPageProps) {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])

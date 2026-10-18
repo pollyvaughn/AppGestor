@@ -13,7 +13,7 @@ import {
     type Resumen,
     fechaCorta,
     periodoCorto,
-} from "./utilTarjetas"
+} from "../lib/tarjetas"
 
 type Tarjeta = {
     id: number

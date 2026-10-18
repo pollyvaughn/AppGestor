@@ -7,7 +7,7 @@ import {
     colorEstado,
     fechaCorta,
     periodoCorto,
-} from "./utilTarjetas"
+} from "../lib/tarjetas"
 
 type CuotaFilaProps = {
     cuota: Cuota

@@ -61,10 +61,6 @@ type Formulario = {
 
 const MONEDAS = ["PYG", "USD", "EUR", "ARS", "BRL"]
 
-type RecurrentesPageProps = {
-    onIrACategorias: () => void
-}
-
 const FILTROS: { key: Filtro; label: string }[] = [
     { key: "TODOS", label: "Todos" },
     { key: "INGRESO", label: "Ingresos" },
@@ -116,9 +112,7 @@ function formularioVacio(): Formulario {
     }
 }
 
-export default function RecurrentesPage({
-    onIrACategorias,
-}: RecurrentesPageProps) {
+export default function RecurrentesPage() {
     const [recurrentes, setRecurrentes] = useState<Recurrente[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])

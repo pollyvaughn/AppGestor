@@ -194,25 +194,10 @@ export default function App() {
                         onIrATarjetas={function () {
                             setVista("tarjetas")
                         }}
-                        onIrACategorias={function () {
-                            setVista("categorias")
-                        }}
                     />
                 )}
-                {vista === "tarjetas" && (
-                    <TarjetasYComprasPage
-                        onIrACategorias={function () {
-                            setVista("categorias")
-                        }}
-                    />
-                )}
-                {vista === "recurrentes" && (
-                    <RecurrentesPage
-                        onIrACategorias={function () {
-                            setVista("categorias")
-                        }}
-                    />
-                )}
+                {vista === "tarjetas" && <TarjetasYComprasPage />}
+                {vista === "recurrentes" && <RecurrentesPage />}
                 {vista === "categorias" && <CategoriasPage />}
                 {vista === "cuentas" && <CuentasPage version={versionDatos} />}
             </Layout>

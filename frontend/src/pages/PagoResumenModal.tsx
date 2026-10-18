@@ -9,7 +9,7 @@ import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import { formatearMonto } from "../lib/moneda"
 import { fechaHoy } from "../lib/fechas"
-import { type Cuenta, type Resumen, periodoCorto } from "./utilTarjetas"
+import { type Cuenta, type Resumen, periodoCorto } from "../lib/tarjetas"
 import { avisoSaldo } from "../lib/saldo"
 
 type PagoResumenModalProps = {

@@ -37,7 +37,7 @@ export type Cuenta = {
     estado: string
 }
 
- export type Ajuste = {
+export type Ajuste = {
     id: number
     cuota_id: number
     tipo: string

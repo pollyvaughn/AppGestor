@@ -14,7 +14,7 @@ import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import { formatearMonto } from "../lib/moneda"
-import { type Ajuste, type Cuota, fechaCorta } from "./utilTarjetas"
+import { type Ajuste, type Cuota, fechaCorta } from "../lib/tarjetas"
 
 type AjustesCuotaModalProps = {
     cuota: Cuota | null
