@@ -29,6 +29,8 @@ import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 import { avisoSaldo } from "../lib/saldo"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
 
+import TransferenciaModal from "../components/movimientos/TransferenciaModal"
+
 type Tipo = "INGRESO" | "EGRESO"
 
 type Filtro = "TODOS" | Tipo
@@ -152,6 +154,7 @@ export default function MensualPage({
     const [mensaje, setMensaje] = useState("")
 
     const [modalAbierto, setModalAbierto] = useState(false)
+    const [modalTransferencia, setModalTransferencia] = useState(false)
     const [editando, setEditando] = useState<number | null>(null)
     const [formulario, setFormulario] = useState<Formulario>(formularioVacio())
 
@@ -210,6 +213,12 @@ export default function MensualPage({
         setFormulario(formularioVacio())
         setError("")
         setModalAbierto(true)
+    }
+
+    function abrirTransferencia() {
+        setError("")
+        setMensaje("")
+        setModalTransferencia(true)
     }
 
     function abrirEdicion(m: Movimiento) {
@@ -533,9 +542,19 @@ export default function MensualPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-lg font-medium">Mensual</h1>
 
-                <Button type="button" onClick={abrirNuevo}>
-                    + Nuevo movimiento
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={abrirTransferencia}
+                    >
+                        Transferir
+                    </Button>
+
+                    <Button type="button" onClick={abrirNuevo}>
+                        + Nuevo movimiento
+                    </Button>
+                </div>
             </div>
 
             {/* Selector de año y mes */}
@@ -1088,7 +1107,7 @@ export default function MensualPage({
 
                             <ul>
                                 {visibles.map(function (m) {
-                                    const esAjuste = m.tipo === "AJUSTE"
+                                    const esAjuste = m.tipo === "AJUSTE" || m.tipo === "SALDO_INICIAL"
                                     const signo =
                                         m.tipo === "INGRESO"
                                             ? "+"
@@ -1158,9 +1177,12 @@ export default function MensualPage({
                                                                     fontSize: "11px",
                                                                 }}
                                                             >
-                                                                {metodoPago?.tipo === "TARJETA_CREDITO"
-                                                                    ? `Tarjeta de crédito · ${m.metodo_pago}`
-                                                                    : m.metodo_pago}
+                                                                {m.tipo === "TRANSFERENCIA" &&
+                                                                m.metodo_pago_destino
+                                                                    ? `${m.metodo_pago} → ${m.metodo_pago_destino}`
+                                                                    : metodoPago?.tipo === "TARJETA_CREDITO"
+                                                                      ? `Tarjeta de crédito · ${m.metodo_pago}`
+                                                                      : m.metodo_pago}
                                                             </span>
                                                         )}
                                                     </p>
@@ -1208,6 +1230,19 @@ export default function MensualPage({
                                                             Anular
                                                         </Button>
                                                     </div>
+                                                )}
+                                                {m.tipo === "TRANSFERENCIA" && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        aria-label={`Anular ${titulo}`}
+                                                        className="!py-1 !text-xs"
+                                                        onClick={function () {
+                                                            anular(m)
+                                                        }}
+                                                    >
+                                                        Anular
+                                                    </Button>
                                                 )}
                                             </div>
                                         </li>
@@ -1377,6 +1412,17 @@ export default function MensualPage({
                     </div>
                 </form>
             </Modal>
+            <TransferenciaModal
+                open={modalTransferencia}
+                cuentas={cuentas}
+                onClose={function () {
+                    setModalTransferencia(false)
+                }}
+                onGuardado={function () {
+                    setMensaje("Transferencia registrada")
+                    cargar()
+                }}
+            />
         </div>
     )
 }

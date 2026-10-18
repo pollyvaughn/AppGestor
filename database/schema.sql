@@ -177,6 +177,8 @@ CREATE TABLE movimiento (
 
     metodo_pago_id INT,
 
+    metodo_pago_destino_id INT,
+
     tipo ENUM(
         'INGRESO',
         'EGRESO',
@@ -223,6 +225,16 @@ CREATE TABLE movimiento (
     CONSTRAINT fk_movimiento_metodo_principal
         FOREIGN KEY (metodo_pago_id)
         REFERENCES metodo_pago(id),
+
+    CONSTRAINT fk_movimiento_metodo_destino
+        FOREIGN KEY (metodo_pago_destino_id)
+        REFERENCES metodo_pago(id),
+
+    CONSTRAINT chk_movimiento_destino
+        CHECK (
+            metodo_pago_destino_id IS NULL
+            OR tipo = 'TRANSFERENCIA'
+        ),
 
     CONSTRAINT chk_movimiento_monto
         CHECK (tipo = 'AJUSTE' OR monto >= 0),

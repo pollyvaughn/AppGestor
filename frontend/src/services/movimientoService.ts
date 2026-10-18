@@ -16,3 +16,7 @@ export function editarMovimiento(id: number, datos: object) {
 export function eliminarMovimiento(id: number) {
     return api(`/movimientos/${id}`, { method: "DELETE" })
 }
+
+export function crearTransferencia(datos: object) {
+    return api("/movimientos/transferencia", { method: "POST", body: datos })
+}

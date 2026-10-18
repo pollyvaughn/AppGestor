@@ -10,7 +10,7 @@ import { formatearMonto } from "../lib/moneda"
 import type { Cuenta, Cuota, Pago } from "./utilTarjetas"
 import Input from "../components/ui/Input"
 import { fechaHoy } from "../lib/fechas"
-import avisoSaldo from "../lib/saldo"
+import { avisoSaldo } from "../lib/saldo"
 
 type PagoCuotaModalProps = {
     cuota: Cuota | null

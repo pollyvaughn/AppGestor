@@ -10,7 +10,7 @@ import Mensaje from "../components/ui/Mensaje"
 import { formatearMonto } from "../lib/moneda"
 import { fechaHoy } from "../lib/fechas"
 import { type Cuenta, type Resumen, periodoCorto } from "./utilTarjetas"
-import avisoSaldo from "../lib/saldo"
+import { avisoSaldo } from "../lib/saldo"
 
 type PagoResumenModalProps = {
     tarjetaId: number | null
@@ -85,7 +85,7 @@ export default function PagoResumenModal({
 
         return avisoSaldo(
             cuenta.nombre,
-            Number(cuenta.saldo)
+            Number(cuenta.saldo),
             montoAPagar,
             moneda
         )

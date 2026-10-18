@@ -4,12 +4,9 @@ export type Movimiento = {
     categoria: string | null
     metodo_pago_id: number | null
     metodo_pago: string | null
-    tipo: "INGRESO"
-        | "EGRESO"
-        | "TRANSFERENCIA"
-        | "PAGO_TARJETA"
-        | "AJUSTE"
-        | "SALDO_INICIAL"
+    tipo: "INGRESO" | "EGRESO" | "TRANSFERENCIA" | "PAGO_TARJETA" | "AJUSTE" | "SALDO_INICIAL"
+    metodo_pago_destino_id: number | null
+    metodo_pago_destino: string | null
     estado: "PENDIENTE" | "CONFIRMADO" | "ANULADO"
     descripcion: string | null
     monto: number

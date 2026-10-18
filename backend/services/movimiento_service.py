@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from backend.database import get_connection
 from backend.services.saldo_service import actualizar_saldo, revertir_saldo
+from datetime import date
 
 def pertenece_a_tarjeta(cursor, movimiento_id):
     cursor.execute(
@@ -149,6 +150,8 @@ def listar_movimientos(usuario_id, categoria_id=None):
                 c.nombre AS categoria,
                 m.metodo_pago_id,
                 mp.nombre AS metodo_pago,
+                m.metodo_pago_destino_id,
+                mpd.nombre AS metodo_pago_destino,
                 m.tipo,
                 m.estado,
                 m.descripcion,
@@ -161,6 +164,8 @@ def listar_movimientos(usuario_id, categoria_id=None):
                 ON m.categoria_id = c.id
             LEFT JOIN metodo_pago mp
                 ON m.metodo_pago_id = mp.id
+            LEFT JOIN metodo_pago mpd
+                ON m.metodo_pago_destino_id = mpd.id
             WHERE m.usuario_id = %s
         """
 
@@ -181,8 +186,11 @@ def listar_movimientos(usuario_id, categoria_id=None):
         conexion.close()
 
 def editar_movimiento(movimiento_id, movimiento, usuario_id):
-    if movimiento.tipo not in ("INGRESO", "EGRESO"):
-        return False, "Tipo de movimiento no permitido"
+    if movimiento_actual["tipo"] not in ("INGRESO", "EGRESO"):
+        return False, (
+            "Solo se pueden editar ingresos y egresos. "
+            "Para corregir, anulá y volvé a registrar"
+        )
 
     if movimiento.tipo in ("INGRESO", "EGRESO"):
         if movimiento.categoria_id is None:
@@ -343,7 +351,7 @@ def eliminar_movimiento(movimiento_id, usuario_id):
         # Obtener movimiento actual
         cursor.execute(
             """
-            SELECT metodo_pago_id, tipo, monto
+            SELECT metodo_pago_id, metodo_pago_destino_id, tipo, monto
             FROM movimiento
             WHERE id = %s
             AND usuario_id = %s
@@ -375,7 +383,20 @@ def eliminar_movimiento(movimiento_id, usuario_id):
                 detail="Este movimiento lo genera el sistema y no se puede anular desde acá"
             )
         # Revertir efecto del movimiento
-        if movimiento["metodo_pago_id"] is not None:
+        if movimiento["tipo"] == "TRANSFERENCIA":
+            revertir_saldo(
+                cursor,
+                movimiento["metodo_pago_id"],
+                movimiento["monto"],
+                "EGRESO"
+            )
+            revertir_saldo(
+                cursor,
+                movimiento["metodo_pago_destino_id"],
+                movimiento["monto"],
+                "INGRESO"
+            )
+        elif movimiento["metodo_pago_id"] is not None:
             revertir_saldo(
                 cursor,
                 movimiento["metodo_pago_id"],
@@ -398,6 +419,106 @@ def eliminar_movimiento(movimiento_id, usuario_id):
         conexion.commit()
 
         return cursor.rowcount
+
+    except Exception:
+        conexion.rollback()
+        raise
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+def crear_transferencia(datos, usuario_id):
+    if datos.origen_id == datos.destino_id:
+        raise ValueError(
+            "La cuenta de origen y la de destino deben ser distintas"
+        )
+
+    fecha = datos.fecha
+
+    if fecha is not None:
+        if fecha > date.today():
+            raise ValueError("La fecha de la transferencia no puede ser futura")
+
+        # si es hoy, se usa la hora actual (NOW()) para ordenar bien el día
+        if fecha == date.today():
+            fecha = None
+
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        conexion.start_transaction()
+
+        cuentas = []
+
+        for cuenta_id in (datos.origen_id, datos.destino_id):
+            cursor.execute(
+                """
+                SELECT id, tipo, moneda
+                FROM metodo_pago
+                WHERE id = %s
+                  AND usuario_id = %s
+                  AND estado = 'ACTIVO'
+                """,
+                (cuenta_id, usuario_id)
+            )
+
+            cuenta = cursor.fetchone()
+
+            if not cuenta:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Cuenta no encontrada"
+                )
+
+            if cuenta["tipo"] == "TARJETA_CREDITO":
+                raise ValueError(
+                    "Las tarjetas se pagan desde la pestaña Tarjetas, "
+                    "no con transferencias"
+                )
+
+            cuentas.append(cuenta)
+
+        if cuentas[0]["moneda"] != cuentas[1]["moneda"]:
+            raise ValueError("Las dos cuentas deben tener la misma moneda")
+
+        cursor.execute(
+            """
+            INSERT INTO movimiento
+            (
+                usuario_id,
+                metodo_pago_id,
+                metodo_pago_destino_id,
+                tipo,
+                estado,
+                descripcion,
+                monto,
+                moneda,
+                fecha
+            )
+            VALUES (%s, %s, %s, 'TRANSFERENCIA', 'CONFIRMADO',
+                    %s, %s, %s, COALESCE(%s, NOW()))
+            """,
+            (
+                usuario_id,
+                datos.origen_id,
+                datos.destino_id,
+                datos.descripcion,
+                datos.monto,
+                cuentas[0]["moneda"],
+                fecha
+            )
+        )
+
+        movimiento_id = cursor.lastrowid
+
+        actualizar_saldo(cursor, datos.origen_id, datos.monto, "EGRESO")
+        actualizar_saldo(cursor, datos.destino_id, datos.monto, "INGRESO")
+
+        conexion.commit()
+
+        return movimiento_id
 
     except Exception:
         conexion.rollback()

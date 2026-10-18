@@ -18,7 +18,7 @@ import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 import { formatearMonto } from "../lib/moneda"
-import avisoSaldo from "../lib/saldo"
+import { avisoSaldo } from "../lib/saldo"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -356,6 +356,29 @@ export default function RecurrentesPage({
                 return
             }
         }
+
+        try {
+            const resultado = await generarMovimiento(
+                generando.id,
+                monto,
+                metodoPagoId
+            )
+
+            setMensaje(
+                `Movimiento generado. Próxima fecha: ${fechaCorta(resultado.proxima_fecha)}`
+            )
+            setGenerando(null)
+            await cargar()
+        } catch (e) {
+            setErrorModal(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudo generar el movimiento"
+            )
+        }
+    }
+
+    // ---------- Datos calculados ----------
 
     // ---------- Datos calculados ----------
 

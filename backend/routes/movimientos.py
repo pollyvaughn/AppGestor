@@ -6,10 +6,12 @@ from backend.auth.dependencies import (
 )
 from backend.models.movimiento import (
     MovimientoCrear,
-    MovimientoEditar
+    MovimientoEditar,
+    TransferenciaCrear
 )
 from backend.services.movimiento_service import (
     crear_movimiento,
+    crear_transferencia,
     listar_movimientos,
     editar_movimiento,
     eliminar_movimiento
@@ -95,4 +97,16 @@ def eliminar(
 
     return {
         "mensaje": "Movimiento anulado"
+    }
+
+@router.post("/transferencia")
+def transferir(
+    datos: TransferenciaCrear,
+    usuario=Depends(obtener_usuario_actual)
+):
+    movimiento_id = crear_transferencia(datos, usuario["id"])
+
+    return {
+        "mensaje": "Transferencia registrada",
+        "id": movimiento_id
     }
