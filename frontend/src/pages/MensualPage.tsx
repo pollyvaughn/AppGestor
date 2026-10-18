@@ -26,6 +26,9 @@ import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 
+import { avisoSaldo } from "../lib/saldo"
+import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
+
 type Tipo = "INGRESO" | "EGRESO"
 
 type Filtro = "TODOS" | Tipo
@@ -266,6 +269,43 @@ export default function MensualPage({
         if (Number(formulario.monto) <= 0) {
             setError("El monto debe ser mayor a 0")
             return
+        }
+
+        if (formulario.tipo === "EGRESO") {
+            const cuenta = cuentas.find(function (c) {
+                return String(c.id) === formulario.cuentaId
+            })
+
+            if (cuenta) {
+                let disponible = Number(cuenta.saldo)
+
+                // al editar, el egreso original ya descontó de esta cuenta
+                const original =
+                    editando !== null
+                        ? movimientos.find(function (m) {
+                              return m.id === editando
+                          })
+                        : undefined
+
+                if (
+                    original &&
+                    original.tipo === "EGRESO" &&
+                    original.metodo_pago_id === cuenta.id
+                ) {
+                    disponible += Number(original.monto)
+                }
+
+                const aviso = avisoSaldo(
+                    cuenta.nombre,
+                    disponible,
+                    Number(formulario.monto),
+                    cuenta.moneda
+                )
+
+                if (aviso && !window.confirm(aviso)) {
+                    return
+                }
+            }
         }
 
         const datos = {
@@ -593,6 +633,7 @@ export default function MensualPage({
 
             {error && !modalAbierto && <Mensaje tipo="error">{error}</Mensaje>}
             {mensaje && <Mensaje tipo="exito">{mensaje}</Mensaje>}
+            {!cargando && <AlertaSaldoNegativo cuentas={cuentas} />}
             {cargando && <Cargando />}
 
             {!cargando && delMes.length === 0 && (

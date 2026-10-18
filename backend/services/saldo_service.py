@@ -17,19 +17,14 @@ def actualizar_saldo(cursor, metodo_pago_id, monto, tipo):
             WHERE id = %s
         """
 
-    elif tipo == "EGRESO":
-        if metodo["tipo"] in ("EFECTIVO", "BILLETERA"):
-            if metodo["saldo"] < monto:
-                raise ValueError(
-                    "Saldo insuficiente para realizar el egreso"
-                )
 
+    elif tipo == "EGRESO":
+        # Se permite quedar en negativo: el front avisa antes de confirmar.
         sql = """
             UPDATE metodo_pago
             SET saldo = saldo - %s
             WHERE id = %s
         """
-
     else:
         return
 

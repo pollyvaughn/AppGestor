@@ -10,6 +10,7 @@ import { formatearMonto } from "../lib/moneda"
 import type { Cuenta, Cuota, Pago } from "./utilTarjetas"
 import Input from "../components/ui/Input"
 import { fechaHoy } from "../lib/fechas"
+import avisoSaldo from "../lib/saldo"
 
 type PagoCuotaModalProps = {
     cuota: Cuota | null
@@ -115,8 +116,8 @@ export default function PagoCuotaModal({
         return Number(cuenta.saldo) + (yaPagado ? Number(yaPagado.monto) : 0)
     }
 
-    // efectivo y billetera no pueden quedar en negativo (regla del backend)
-    function validarSaldo(cuentaId: string, montoAPagar: number) {
+    // si la cuenta queda en negativo, se avisa pero se deja seguir
+    function avisoDeSaldo(cuentaId: string, montoAPagar: number) {
         const cuenta = cuentasUsables.find(function (c) {
             return String(c.id) === cuentaId
         })
@@ -125,13 +126,12 @@ export default function PagoCuotaModal({
             return ""
         }
 
-        const controla = cuenta.tipo === "EFECTIVO" || cuenta.tipo === "BILLETERA"
-
-        if (controla && saldoDisponible(cuentaId) < montoAPagar) {
-            return `Saldo insuficiente en ${cuenta.nombre}`
-        }
-
-        return ""
+        return avisoSaldo(
+            cuenta.nombre,
+            saldoDisponible(cuentaId),
+            montoAPagar,
+            moneda
+        )
     }
 
     async function guardar(evento: React.FormEvent<HTMLFormElement>) {
@@ -186,20 +186,16 @@ export default function PagoCuotaModal({
             }
         }
 
-        const errorSaldo1 = validarSaldo(cuenta1, parte1)
-
-        if (errorSaldo1) {
-            setError(errorSaldo1)
-            return
-        }
+        const avisos = [avisoDeSaldo(cuenta1, parte1)]
 
         if (dividir) {
-            const errorSaldo2 = validarSaldo(cuenta2, parte2)
+            avisos.push(avisoDeSaldo(cuenta2, parte2))
+        }
 
-            if (errorSaldo2) {
-                setError(errorSaldo2)
-                return
-            }
+        const textoAviso = avisos.filter(Boolean).join("\n")
+
+        if (textoAviso && !window.confirm(textoAviso)) {
+            return
         }
 
         const metodos = [

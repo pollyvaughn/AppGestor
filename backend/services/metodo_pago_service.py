@@ -191,11 +191,6 @@ def ajustar_saldo(metodo_id, datos, usuario_id):
         if not metodo:
             return None
 
-        if datos.saldo_real < 0 and metodo["tipo"] in ("EFECTIVO", "BILLETERA"):
-            raise ValueError(
-                "El efectivo y la billetera no pueden tener saldo negativo"
-            )
-
         diferencia = round(datos.saldo_real - float(metodo["saldo"]), 2)
 
         if diferencia == 0:

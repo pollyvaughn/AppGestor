@@ -18,6 +18,7 @@ import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import CategoriaShortcut from "../components/ui/CategoriaShortcut"
 import { formatearMonto } from "../lib/moneda"
+import avisoSaldo from "../lib/saldo"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -334,7 +335,6 @@ export default function RecurrentesPage({
             return
         }
 
-        // efectivo y billetera no pueden quedar en negativo (regla del backend)
         const metodoPagoId = cuentaGenerar ? Number(cuentaGenerar) : undefined
         const cuenta = cuentas.find(function (c) {
             return c.id === metodoPagoId
@@ -343,33 +343,19 @@ export default function RecurrentesPage({
         if (
             generando.tipo === "EGRESO" &&
             cuenta &&
-            (cuenta.tipo === "EFECTIVO" || cuenta.tipo === "BILLETERA") &&
-            Number(cuenta.saldo) < monto
+            cuenta.tipo !== "TARJETA_CREDITO"
         ) {
-            setErrorModal(`Saldo insuficiente en ${cuenta.nombre}`)
-            return
-        }
-
-        try {
-            const resultado = await generarMovimiento(
-                generando.id,
+            const aviso = avisoSaldo(
+                cuenta.nombre,
+                Number(cuenta.saldo),
                 monto,
-                metodoPagoId
+                cuenta.moneda
             )
 
-            setMensaje(
-                `Movimiento generado. Próxima fecha: ${fechaCorta(resultado.proxima_fecha)}`
-            )
-            setGenerando(null)
-            await cargar()
-        } catch (e) {
-            setErrorModal(
-                e instanceof Error
-                    ? e.message
-                    : "No se pudo generar el movimiento"
-            )
+            if (aviso && !window.confirm(aviso)) {
+                return
+            }
         }
-    }
 
     // ---------- Datos calculados ----------
 

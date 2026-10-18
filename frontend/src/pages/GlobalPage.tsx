@@ -41,6 +41,7 @@ import EvolucionChart from "../components/global/EvolucionChart"
 import ComposicionGastoChart from "../components/global/ComposicionGastoChart"
 import RitmoGastoChart from "../components/global/RitmoGastoChart"
 import TablaMensual from "../components/global/TablaMensual"
+import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
 
 const estiloCard = {
     background: "var(--color-card)",
@@ -60,6 +61,7 @@ function textoOperaciones(cantidad: number) {
 }
 
 type Cuenta = {
+    nombre: string
     tipo: string
     moneda: string
     saldo: number
@@ -266,6 +268,7 @@ export default function GlobalPage() {
             <h1 className="text-lg font-medium">Global</h1>
 
             {error && <Mensaje tipo="error">{error}</Mensaje>}
+            {!cargando && <AlertaSaldoNegativo cuentas={cuentas} />}
             {cargando && <Cargando />}
 
             {!cargando && !error && monedas.length === 0 && (

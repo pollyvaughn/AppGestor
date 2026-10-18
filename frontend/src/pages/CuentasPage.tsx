@@ -14,6 +14,7 @@ import Select from "../components/ui/Select"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
+import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
 import { formatearMonto } from "../lib/moneda"
 
 type TipoCuenta =
@@ -223,6 +224,8 @@ export default function CuentasPage() {
 
             {mensaje && <Mensaje tipo="exito">{mensaje}</Mensaje>}
 
+            {!cargando && <AlertaSaldoNegativo cuentas={cuentas} />}
+
             {cargando && <Cargando />}
 
             {!cargando && cuentas.length === 0 && (
@@ -301,7 +304,7 @@ export default function CuentasPage() {
                                         abrirAjuste(cuenta)
                                     }}
                                 >
-                                        Ajustar saldo
+                                    Ajustar saldo
                                 </Button>
 
                                 <Button
@@ -438,6 +441,7 @@ export default function CuentasPage() {
                     </div>
                 </form>
             </Modal>
+
             <Modal
                 open={ajustando !== null}
                 title="Ajustar saldo"
