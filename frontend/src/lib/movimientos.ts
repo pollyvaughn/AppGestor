@@ -4,8 +4,7 @@ export type Movimiento = {
     categoria: string | null
     metodo_pago_id: number | null
     metodo_pago: string | null
-    tipo:
-        | "INGRESO"
+    tipo: "INGRESO"
         | "EGRESO"
         | "TRANSFERENCIA"
         | "PAGO_TARJETA"

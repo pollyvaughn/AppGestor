@@ -225,7 +225,7 @@ CREATE TABLE movimiento (
         REFERENCES metodo_pago(id),
 
     CONSTRAINT chk_movimiento_monto
-        CHECK (monto >= 0),
+        CHECK (tipo = 'AJUSTE' OR monto >= 0),
 
     CONSTRAINT chk_movimiento_tipo_cambio
         CHECK (

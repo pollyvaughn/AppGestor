@@ -15,3 +15,10 @@ export function editarCuenta(id: number, datos: object) {
 export function eliminarCuenta(id: number) {
     return api(`/metodos-pago/${id}`, { method: "DELETE" })
 }
+
+export function ajustarSaldoCuenta(id: number, saldoReal: number, motivo: string | null) {
+    return api(`/metodos-pago/${id}/ajustar-saldo`, {
+        method: "POST",
+        body: { saldo_real: saldoReal, motivo },
+    })
+}

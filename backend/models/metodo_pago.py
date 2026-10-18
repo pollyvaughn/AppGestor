@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal
 
 
@@ -11,7 +11,7 @@ class MetodoPagoCrear(BaseModel):
     ]
     nombre: str
     moneda: Literal["PYG", "USD", "EUR", "ARS", "BRL"]
-    saldo: float = 0
+    saldo: float = Field(default=0, ge=0)
 
 
 class MetodoPagoEditar(BaseModel):
@@ -22,5 +22,8 @@ class MetodoPagoEditar(BaseModel):
         "TARJETA_CREDITO"
     ]
     nombre: str
-    moneda: Literal["PYG", "USD", "EUR", "ARS", "BRL"]
-    saldo: float
+
+
+class AjusteSaldo(BaseModel):
+    saldo_real: float
+    motivo: str | None = None

@@ -5,69 +5,38 @@ from fastapi import HTTPException
 
 
 def crear_metodo_pago(metodo, usuario_id):
+    if metodo.tipo == "TARJETA_CREDITO":
+        raise HTTPException(
+            status_code=400,
+            detail="Las tarjetas se administran desde la pestaña Tarjetas"
+        )
+
     conexion = get_connection()
 
     try:
         cursor = conexion.cursor()
 
-        conexion.start_transaction()
-
-        sql = """
+        cursor.execute(
+            """
             INSERT INTO metodo_pago
             (usuario_id, tipo, nombre, moneda, estado, saldo)
             VALUES (%s, %s, %s, %s, 'ACTIVO', %s)
-        """
-
-        valores = (
-            usuario_id,
-            metodo.tipo,
-            metodo.nombre,
-            metodo.moneda,
-            metodo.saldo
+            """,
+            (usuario_id, metodo.tipo, metodo.nombre, metodo.moneda, metodo.saldo)
         )
-
-        cursor.execute(sql, valores)
 
         metodo_id = cursor.lastrowid
 
-        # Una cuenta que nace con plata registra ese saldo como un
-        # movimiento SALDO_INICIAL. No pasa por actualizar_saldo porque
-        # el saldo ya quedó guardado en el INSERT de arriba (si no, se
-        # sumaría dos veces). Tampoco cuenta como ingreso en los reportes.
-        if metodo.tipo != "TARJETA_CREDITO" and metodo.saldo > 0:
+        if metodo.saldo != 0:
             cursor.execute(
                 """
                 INSERT INTO movimiento
-                (
-                    usuario_id,
-                    categoria_id,
-                    metodo_pago_id,
-                    tipo,
-                    estado,
-                    descripcion,
-                    monto,
-                    moneda,
-                    fecha
-                )
-                VALUES (
-                    %s,
-                    NULL,
-                    %s,
-                    'SALDO_INICIAL',
-                    'CONFIRMADO',
-                    %s,
-                    %s,
-                    %s,
-                    NOW()
-                )
+                (usuario_id, metodo_pago_id, tipo, estado,
+                 descripcion, monto, moneda)
+                 VALUES (%s, %s, 'SALDO_INICIAL', 'CONFIRMADO',
+                        'Saldo inicial', %s, %s)
                 """,
-                (
-                    usuario_id,
-                    metodo_id,
-                    "Saldo inicial",
-                    metodo.saldo,
-                    metodo.moneda
-                )
+                (usuario_id, metodo_id, metodo.saldo, metodo.moneda)
             )
 
         conexion.commit()
@@ -81,7 +50,6 @@ def crear_metodo_pago(metodo, usuario_id):
     finally:
         cursor.close()
         conexion.close()
-
 
 def listar_metodos_pago(usuario_id):
     conexion = get_connection()
@@ -105,7 +73,6 @@ def listar_metodos_pago(usuario_id):
         cursor.close()
         conexion.close()
 
-
 def editar_metodo_pago(metodo_id, metodo, usuario_id):
     if metodo.tipo == "TARJETA_CREDITO":
         raise HTTPException(
@@ -118,26 +85,18 @@ def editar_metodo_pago(metodo_id, metodo, usuario_id):
     try:
         cursor = conexion.cursor()
 
+        # moneda y saldo no se editan: el saldo solo cambia con movimientos
         cursor.execute(
             """
             UPDATE metodo_pago
             SET tipo = %s,
-                nombre = %s,
-                moneda = %s,
-                saldo = %s
+                nombre = %s
             WHERE id = %s
               AND usuario_id = %s
               AND estado = 'ACTIVO'
               AND tipo != 'TARJETA_CREDITO'
             """,
-            (
-                metodo.tipo,
-                metodo.nombre,
-                metodo.moneda,
-                metodo.saldo,
-                metodo_id,
-                usuario_id
-            )
+            (metodo.tipo, metodo.nombre, metodo_id, usuario_id)
         )
         conexion.commit()
 
@@ -150,7 +109,6 @@ def editar_metodo_pago(metodo_id, metodo, usuario_id):
     finally:
         cursor.close()
         conexion.close()
-
 
 def eliminar_metodo_pago(metodo_id, usuario_id):
     conexion = get_connection()
@@ -204,6 +162,79 @@ def eliminar_metodo_pago(metodo_id, usuario_id):
         conexion.commit()
 
         return cursor.rowcount
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+def ajustar_saldo(metodo_id, datos, usuario_id):
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT id, tipo, moneda, saldo
+            FROM metodo_pago
+            WHERE id = %s
+              AND usuario_id = %s
+              AND estado = 'ACTIVO'
+              AND tipo != 'TARJETA_CREDITO'
+            FOR UPDATE
+            """,
+            (metodo_id, usuario_id)
+        )
+
+        metodo = cursor.fetchone()
+
+        if not metodo:
+            return None
+
+        if datos.saldo_real < 0 and metodo["tipo"] in ("EFECTIVO", "BILLETERA"):
+            raise ValueError(
+                "El efectivo y la billetera no pueden tener saldo negativo"
+            )
+
+        diferencia = round(datos.saldo_real - float(metodo["saldo"]), 2)
+
+        if diferencia == 0:
+            raise ValueError("El saldo ya coincide, no hay nada que ajustar")
+
+        cursor.execute(
+            """
+            INSERT INTO movimiento
+            (usuario_id, metodo_pago_id, tipo, estado,
+             descripcion, monto, moneda)
+            VALUES (%s, %s, 'AJUSTE', 'CONFIRMADO', %s, %s, %s)
+            """,
+            (
+                usuario_id,
+                metodo_id,
+                datos.motivo or "Ajuste de saldo",
+                diferencia,
+                metodo["moneda"]
+            )
+        )
+
+        movimiento_id = cursor.lastrowid
+
+        cursor.execute(
+            "UPDATE metodo_pago SET saldo = saldo + %s WHERE id = %s",
+            (diferencia, metodo_id)
+        )
+
+        conexion.commit()
+
+        return {
+            "mensaje": "Saldo ajustado",
+            "movimiento_id": movimiento_id,
+            "diferencia": diferencia
+        }
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()

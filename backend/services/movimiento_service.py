@@ -15,6 +15,9 @@ def pertenece_a_tarjeta(cursor, movimiento_id):
     return bool(cursor.fetchone()["es_de_tarjeta"])
 
 def crear_movimiento(movimiento, usuario_id):
+    if movimiento.tipo not in ("INGRESO", "EGRESO"):
+        return None, "Tipo de movimiento no permitido"
+
     if movimiento.tipo in ("INGRESO", "EGRESO"):
         if movimiento.categoria_id is None:
             return None, "La categoría es obligatoria para ingresos y egresos"
@@ -178,6 +181,9 @@ def listar_movimientos(usuario_id, categoria_id=None):
         conexion.close()
 
 def editar_movimiento(movimiento_id, movimiento, usuario_id):
+    if movimiento.tipo not in ("INGRESO", "EGRESO"):
+        return False, "Tipo de movimiento no permitido"
+
     if movimiento.tipo in ("INGRESO", "EGRESO"):
         if movimiento.categoria_id is None:
             return False, "La categoría es obligatoria para ingresos y egresos"
@@ -205,6 +211,9 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
 
         if not movimiento_actual:
             return False, "Movimiento no encontrado"
+
+        if movimiento_actual["tipo"] in ("AJUSTE", "SALDO_INICIAL"):
+            return False, "Los ajustes no se editan: para corregir, hacé otro ajuste de saldo"
 
         if pertenece_a_tarjeta(cursor, movimiento_id):
             return False, "Las compras y pagos de tarjeta se administran desde Tarjetas"
@@ -347,6 +356,12 @@ def eliminar_movimiento(movimiento_id, usuario_id):
 
         if not movimiento:
             return 0
+
+        if movimiento["tipo"] in ("AJUSTE", "SALDO_INICIAL"):
+            raise HTTPException(
+                status_code=400,
+                detail="Los ajustes no se anulan: para corregir, hacé otro ajuste de saldo"
+            )
 
         if pertenece_a_tarjeta(cursor, movimiento_id):
             raise HTTPException(

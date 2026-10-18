@@ -4,6 +4,7 @@ import {
     crearCuenta,
     editarCuenta,
     eliminarCuenta,
+    ajustarSaldoCuenta
 } from "../services/cuentaService"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
@@ -66,6 +67,15 @@ export default function CuentasPage() {
     const [formulario, setFormulario] = useState<Formulario>(formularioInicial)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
+
+    const [ajustando, setAjustando] = useState<Cuenta | null>(null)
+    const [saldoReal, setSaldoReal] = useState("")
+    const [motivo, setMotivo] = useState("")
+    const [errorAjuste, setErrorAjuste] = useState("")
+
+    const diferencia = ajustando
+        ? Math.round((Number(saldoReal || 0) - Number(ajustando.saldo)) * 100) / 100
+        : 0
 
     async function cargar() {
         try {
@@ -166,6 +176,39 @@ export default function CuentasPage() {
         }
     }
 
+    function abrirAjuste(cuenta: Cuenta) {
+        setAjustando(cuenta)
+        setSaldoReal(String(Number(cuenta.saldo)))
+        setMotivo("")
+        setErrorAjuste("")
+    }
+
+    async function guardarAjuste(evento: React.FormEvent<HTMLFormElement>) {
+        evento.preventDefault()
+
+        if (ajustando === null) {
+            return
+        }
+
+        setErrorAjuste("")
+        setMensaje("")
+
+        try {
+            await ajustarSaldoCuenta(
+                ajustando.id,
+                Number(saldoReal || 0),
+                motivo || null
+            )
+            setMensaje("Saldo ajustado")
+            setAjustando(null)
+            await cargar()
+        } catch (e) {
+            setErrorAjuste(
+                e instanceof Error ? e.message : "No se pudo ajustar el saldo"
+            )
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -247,6 +290,18 @@ export default function CuentasPage() {
                                     }}
                                 >
                                     Editar
+                                </Button>
+
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    aria-label={`Ajustar saldo de ${cuenta.nombre}`}
+                                    className="!py-1 !text-xs"
+                                    onClick={function () {
+                                        abrirAjuste(cuenta)
+                                    }}
+                                >
+                                        Ajustar saldo
                                 </Button>
 
                                 <Button
@@ -343,15 +398,24 @@ export default function CuentasPage() {
                             })}
                         </Select>
 
-                        <MontoInput
-                            id="saldo"
-                            label="Saldo"
-                            moneda={formulario.moneda}
-                            value={formulario.saldo}
-                            onChange={function (valor) {
-                                setFormulario({ ...formulario, saldo: valor })
-                            }}
-                        />
+                        {editando === null ? (
+                            <MontoInput
+                                id="saldo"
+                                label="Saldo inicial"
+                                moneda={formulario.moneda}
+                                value={formulario.saldo}
+                                onChange={function (valor) {
+                                    setFormulario({ ...formulario, saldo: valor })
+                                }}
+                            />
+                        ) : (
+                            <p
+                                className="text-xs self-end pb-2"
+                                style={{ color: "var(--color-muted-foreground)" }}
+                            >
+                                Para corregir el saldo usá "Ajustar saldo" en la tarjeta de la cuenta.
+                            </p>
+                        )}
                     </div>
 
                     {error && <Mensaje tipo="error">{error}</Mensaje>}
@@ -373,6 +437,70 @@ export default function CuentasPage() {
                         </Button>
                     </div>
                 </form>
+            </Modal>
+            <Modal
+                open={ajustando !== null}
+                title="Ajustar saldo"
+                onClose={function () {
+                    setAjustando(null)
+                }}
+            >
+                {ajustando && (
+                    <form onSubmit={guardarAjuste} className="space-y-4">
+                        <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+                            {ajustando.nombre} · saldo actual{" "}
+                            {formatearMonto(Number(ajustando.saldo), ajustando.moneda)}{" "}
+                            {ajustando.moneda}. Indicá cuánto hay realmente: se registra un
+                            movimiento de ajuste por la diferencia.
+                        </p>
+
+                        <MontoInput
+                            id="saldo-real"
+                            label={`Saldo real (${ajustando.moneda})`}
+                            moneda={ajustando.moneda}
+                            value={saldoReal}
+                            onChange={setSaldoReal}
+                            required
+                        />
+
+                        {diferencia !== 0 && (
+                            <p className="text-xs" style={{ fontFamily: "var(--font-mono)" }}>
+                                Diferencia: {diferencia > 0 ? "+" : "−"}
+                                {formatearMonto(Math.abs(diferencia), ajustando.moneda)}{" "}
+                                {ajustando.moneda}
+                            </p>
+                        )}
+
+                        <Input
+                            id="motivo-ajuste"
+                            label="Motivo (opcional)"
+                            value={motivo}
+                            onChange={function (e) {
+                                setMotivo(e.target.value)
+                            }}
+                            placeholder="Ej. Olvidé cargar un gasto"
+                        />
+
+                        {errorAjuste && <Mensaje tipo="error">{errorAjuste}</Mensaje>}
+
+                        <div className="flex gap-2 pt-1">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="flex-1"
+                                onClick={function () {
+                                    setAjustando(null)
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+
+                            <Button type="submit" className="flex-1" disabled={diferencia === 0}>
+                                Registrar ajuste
+                            </Button>
+                        </div>
+                    </form>
+                )}
             </Modal>
         </div>
     )

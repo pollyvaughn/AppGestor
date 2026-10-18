@@ -50,8 +50,7 @@ type FiltroCategoria = {
     nombre: string
 }
 
-type Cuenta = { id: number; nombre: string; tipo: string; moneda: string }
-
+type Cuenta = { id: number; nombre: string; tipo: string; moneda: string; saldo: number }
 type MensualPageProps = {
     onIrATarjetas: () => void
     onIrACategorias: () => void
@@ -412,7 +411,11 @@ export default function MensualPage({
     }
 
     const balance = ingresos - egresos
-
+    const saldoActual = cuentas.reduce(function (total, c) {
+        return c.tipo === "TARJETA_CREDITO" || c.moneda !== moneda
+            ? total
+            : total + Number(c.saldo)
+    }, 0)
     // Porcentaje de lo ingresado que no se gastó (solo tiene sentido si hubo ingresos)
     const tasaAhorro =
         ingresos > 0 ? Math.round((balance / ingresos) * 100) : null
@@ -665,7 +668,7 @@ export default function MensualPage({
                                     letterSpacing: "0.08em",
                                 }}
                             >
-                                Balance {nombreMes(mes)}
+                                Resultado {nombreMes(mes)}
                             </span>
 
                             <p
@@ -708,7 +711,10 @@ export default function MensualPage({
                                         ? "Sin ingresos este mes"
                                         : tasaAhorro >= 0
                                           ? `Ahorraste el ${tasaAhorro}% de tus ingresos`
-                                          : "Gastaste más de lo que ingresaste"}
+                                          : "Gastos por encima de los ingresos del mes"}
+                                </p>
+                                <p className="mt-2 text-xs" style={{ color: "var(--color-accent)" }}>
+                                    Saldo actual en cuentas: {formatearMonto(saldoActual, moneda)} {moneda}
                                 </p>
                             </div>
                         </div>
@@ -1041,12 +1047,15 @@ export default function MensualPage({
 
                             <ul>
                                 {visibles.map(function (m) {
+                                    const esAjuste = m.tipo === "AJUSTE"
                                     const signo =
                                         m.tipo === "INGRESO"
                                             ? "+"
                                             : m.tipo === "EGRESO"
                                               ? "−"
-                                              : ""
+                                              : esAjuste
+                                                ? Number(m.monto) >= 0 ? "+" : "−"
+                                                : ""
 
                                     const etiquetaTipo = ETIQUETA_TIPO[m.tipo]
                                     const metodoPago = cuentas.find(function (cuenta) {
@@ -1130,7 +1139,7 @@ export default function MensualPage({
                                                     }}
                                                 >
                                                     {signo}
-                                                    {formatearMonto(m.monto, m.moneda)} {m.moneda}
+                                                    {formatearMonto(esAjuste ? Math.abs(Number(m.monto)) : m.monto, m.moneda)} {m.moneda}
                                                 </span>
 
                                                 {puedeEditar(m) && (

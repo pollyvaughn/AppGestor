@@ -3,13 +3,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.auth.dependencies import obtener_usuario_actual
 from backend.models.metodo_pago import (
     MetodoPagoCrear,
-    MetodoPagoEditar
+    MetodoPagoEditar,
+    AjusteSaldo
 )
 from backend.services.metodo_pago_service import (
     crear_metodo_pago,
     listar_metodos_pago,
     editar_metodo_pago,
-    eliminar_metodo_pago
+    eliminar_metodo_pago,
+    ajustar_saldo
 )
 
 router = APIRouter(
@@ -75,3 +77,19 @@ def eliminar(
     return {
         "mensaje": "Método de pago desactivado"
     }
+
+@router.post("/{metodo_id}/ajustar-saldo")
+def ajustar(
+    metodo_id: int,
+    datos: AjusteSaldo,
+    usuario=Depends(obtener_usuario_actual)
+):
+    resultado = ajustar_saldo(metodo_id, datos, usuario["id"])
+
+    if resultado is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Método de pago no encontrado"
+        )
+
+    return resultado
