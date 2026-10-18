@@ -281,11 +281,10 @@ def crear_pago(pago, usuario_id):
                 "EGRESO"
             )
 
-        nuevo_pendiente = (
-            float(cuota["monto_pendiente"]) - pago.monto
-        )
+        nuevo_pendiente = round(float(cuota["monto_pendiente"]) - pago.monto, 2)
 
-        if nuevo_pendiente == 0:
+        if nuevo_pendiente <= 0:
+            nuevo_pendiente = 0
             nuevo_estado = "PAGADA"
         else:
             nuevo_estado = "PARCIAL"
@@ -487,7 +486,7 @@ def editar_pago(pago_id, pago, usuario_id):
 
         nuevo_total_pagado = total_otros_pagos + pago.monto
 
-        if nuevo_total_pagado > total_cuota:
+        if round(nuevo_total_pagado, 2) > round(total_cuota, 2):
             raise HTTPException(
                 status_code=400,
                 detail="El monto editado supera el total pendiente disponible de la cuota"

@@ -141,10 +141,20 @@ def omitir_cuota(cuota_id, usuario_id):
             siguiente_cuota["monto_pendiente"] + saldo_arrastrar
         )
 
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(monto), 0) AS total_pagado
+            FROM pago
+            WHERE cuota_id = %s
+              AND estado = 'CONFIRMADO'
+            """,
+            (siguiente_cuota["id"],)
+        )
+
+        total_pagado_siguiente = cursor.fetchone()["total_pagado"]
+
         estado_siguiente = (
-            "PAGADA"
-            if nuevo_pendiente == 0
-            else "PARCIAL"
+            "PARCIAL" if total_pagado_siguiente > 0 else "PENDIENTE"
         )
 
         cursor.execute(

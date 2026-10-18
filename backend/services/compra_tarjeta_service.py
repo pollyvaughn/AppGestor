@@ -1,8 +1,8 @@
-from backend.database import get_connection
-from fastapi import HTTPException
-
+from decimal import Decimal, ROUND_DOWN
 from datetime import date
 from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException
+from backend.database import get_connection
 
 
 def crear_compra_con_cursor(
@@ -24,7 +24,8 @@ def crear_compra_con_cursor(
             tc.id,
             tc.fecha_cierre,
             tc.fecha_vencimiento,
-            tc.limite_credito
+            tc.limite_credito,
+            mp.moneda
         FROM tarjeta_credito tc
         INNER JOIN metodo_pago mp
             ON tc.metodo_pago_id = mp.id
@@ -54,9 +55,20 @@ def crear_compra_con_cursor(
 
     deuda = cursor.fetchone()["deuda"]
 
+    decimales = 0 if tarjeta["moneda"] == "PYG" else 2
+    paso = Decimal(1).scaleb(-decimales)
+    total = Decimal(str(monto))
+
+    if total != total.quantize(paso):
+        raise ValueError(
+            "Los guaraníes no admiten decimales"
+            if decimales == 0
+            else "El monto admite como máximo 2 decimales"
+        )
+
     disponible = tarjeta["limite_credito"] - deuda
 
-    if monto > disponible:
+    if total > disponible:
         raise HTTPException(
             status_code=400,
             detail=f"La compra supera el límite disponible. Disponible: {disponible}"
@@ -111,7 +123,7 @@ def crear_compra_con_cursor(
             usuario_id,
             categoria_id,
             descripcion,
-            monto,
+            total,
             fecha_compra,
             tarjeta_id
         )
@@ -134,7 +146,7 @@ def crear_compra_con_cursor(
         (
             movimiento_id,
             tarjeta_id,
-            monto,
+            total,
             cantidad_cuotas,
             fecha_compra
         )
@@ -169,13 +181,20 @@ def crear_compra_con_cursor(
             + relativedelta(months=1)
         )
 
-    monto_cuota = monto / cantidad_cuotas
+    cuota_base = (total / cantidad_cuotas).quantize(paso, rounding=ROUND_DOWN)
+    ultima_cuota = total - (cuota_base * (cantidad_cuotas - 1))
 
     for numero in range(1, cantidad_cuotas + 1):
+        monto_cuota = ultima_cuota if numero == cantidad_cuotas else cuota_base
 
         periodo = primer_periodo + relativedelta(months=numero - 1)
 
-        mes_vencimiento = periodo + relativedelta(months=1)
+        # Vencimiento posterior al cierre: vence el mismo mes (cierre 5, vence 20).
+        # Vencimiento igual o anterior: vence el mes siguiente (cierre 25, vence 10).
+        if dia_vencimiento > dia_cierre:
+            mes_vencimiento = periodo
+        else:
+            mes_vencimiento = periodo + relativedelta(months=1)
 
         primer_dia_mes = mes_vencimiento.replace(day=1)
 
