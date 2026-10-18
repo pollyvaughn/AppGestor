@@ -11,6 +11,13 @@ type Tarjeta = {
     estado: string
 }
 
+type Pestana = "resumenes" | "compras"
+
+const PESTANAS: { key: Pestana; label: string }[] = [
+    { key: "resumenes", label: "Resúmenes" },
+    { key: "compras", label: "Compras con tarjeta" },
+]
+
 type TarjetasYComprasPageProps = {
     onIrACategorias: () => void
 }
@@ -21,6 +28,7 @@ export default function TarjetasYComprasPage({
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
     const [version, setVersion] = useState(0)
     const [versionCompras, setVersionCompras] = useState(0)
+    const [pestana, setPestana] = useState<Pestana>("resumenes")
 
     async function cargarTarjetas() {
         try {
@@ -54,18 +62,74 @@ export default function TarjetasYComprasPage({
         <div className="space-y-10">
             <TarjetasPage key={version} onCambio={cargarTarjetas} />
 
-            <ResumenesTarjeta
-                tarjetas={tarjetas}
-                version={version}
-                onCambio={alPagarResumen}
-            />
+            <div>
+                <div
+                    role="tablist"
+                    aria-label="Resúmenes y compras con tarjeta"
+                    className="flex overflow-x-auto mb-6"
+                    style={{ borderBottom: "1px solid var(--color-border)" }}
+                >
+                    {PESTANAS.map(function (item) {
+                        const activa = pestana === item.key
 
-            <ComprasTarjetaPage
-                key={versionCompras}
-                tarjetas={tarjetas}
-                onCambio={refrescarTodo}
-                onIrACategorias={onIrACategorias}
-            />
+                        return (
+                            <button
+                                key={item.key}
+                                id={`tab-${item.key}`}
+                                type="button"
+                                role="tab"
+                                aria-selected={activa}
+                                aria-controls={`panel-${item.key}`}
+                                onClick={function () {
+                                    setPestana(item.key)
+                                }}
+                                className="shrink-0 whitespace-nowrap text-xs px-4 py-2 min-h-11"
+                                style={{
+                                    fontWeight: activa ? 600 : 400,
+                                    color: activa
+                                        ? "var(--color-foreground)"
+                                        : "var(--color-muted-foreground)",
+                                    borderBottom: activa
+                                        ? "2px solid var(--color-foreground)"
+                                        : "2px solid transparent",
+                                }}
+                            >
+                                {item.label}
+                            </button>
+                        )
+                    })}
+                </div>
+
+                {/* Los dos paneles quedan montados y se oculta el que no está activo:
+                    así no se pierde lo que estabas viendo (cuotas abiertas, etc.)
+                    y la lógica de refresco de arriba sigue funcionando igual. */}
+                <div
+                    role="tabpanel"
+                    id="panel-resumenes"
+                    aria-labelledby="tab-resumenes"
+                    hidden={pestana !== "resumenes"}
+                >
+                    <ResumenesTarjeta
+                        tarjetas={tarjetas}
+                        version={version}
+                        onCambio={alPagarResumen}
+                    />
+                </div>
+
+                <div
+                    role="tabpanel"
+                    id="panel-compras"
+                    aria-labelledby="tab-compras"
+                    hidden={pestana !== "compras"}
+                >
+                    <ComprasTarjetaPage
+                        key={versionCompras}
+                        tarjetas={tarjetas}
+                        onCambio={refrescarTodo}
+                        onIrACategorias={onIrACategorias}
+                    />
+                </div>
+            </div>
         </div>
     )
 }
