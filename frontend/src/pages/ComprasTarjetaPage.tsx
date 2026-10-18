@@ -31,6 +31,8 @@ import {
     puedePagarCuota,
 } from "./utilTarjetas"
 
+import { fechaHoy } from "../lib/fechas"
+
 type Tarjeta = {
     id: number
     nombre: string
@@ -62,6 +64,18 @@ type Formulario = {
     monto: string
     cuotas: string
     descripcion: string
+    fecha: string
+}
+
+function formularioVacio(): Formulario {
+    return {
+        tarjetaId: "",
+        categoriaId: "",
+        monto: "",
+        cuotas: "1",
+        descripcion: "",
+        fecha: fechaHoy(),
+    }
 }
 
 type Aviso = { tipo: "error" | "exito"; texto: string } | null
@@ -96,7 +110,7 @@ export default function ComprasTarjetaPage({
 
     // nueva compra
     const [modalNueva, setModalNueva] = useState(false)
-    const [formulario, setFormulario] = useState<Formulario>(formularioInicial)
+    const [formulario, setFormulario] = useState<Formulario>(formularioVacio)
     const [errorModal, setErrorModal] = useState("")
 
     // editar descripción
@@ -245,7 +259,7 @@ export default function ComprasTarjetaPage({
     // ---------- Nueva compra ----------
 
     function abrirNueva() {
-        setFormulario(formularioInicial)
+        setFormulario(formularioVacio())
         setErrorModal("")
         setModalNueva(true)
     }
@@ -271,6 +285,11 @@ export default function ComprasTarjetaPage({
         setErrorModal("")
         setError("")
         setMensaje("")
+
+        if (!formulario.fecha || formulario.fecha > fechaHoy()) {
+            setErrorModal("Elegí una fecha válida (no puede ser futura)")
+            return
+        }
 
         if (!formulario.tarjetaId) {
             setErrorModal("Elegí una tarjeta")
@@ -299,6 +318,7 @@ export default function ComprasTarjetaPage({
                 monto: montoForm,
                 cantidad_cuotas: cantidadCuotas,
                 descripcion: formulario.descripcion || null,
+                fecha_compra: formulario.fecha,
             })
 
             setMensaje("Compra registrada")
@@ -781,6 +801,29 @@ export default function ComprasTarjetaPage({
                             {monedaForm}
                         </p>
                     )}
+
+                    <Input
+                        id="fecha-compra"
+                        label="Fecha de la compra"
+                        type="date"
+                        max={fechaHoy()}
+                        value={formulario.fecha}
+                        onChange={function (e) {
+                            setFormulario({
+                                ...formulario,
+                                fecha: e.target.value,
+                            })
+                        }}
+                        required
+                    />
+
+                    <p
+                        className="text-xs"
+                        style={{ color: "var(--color-muted-foreground)" }}
+                    >
+                        La fecha define en qué período cae la primera cuota,
+                        según el día de cierre de la tarjeta.
+                    </p>
 
                     <Input
                         id="descripcion"

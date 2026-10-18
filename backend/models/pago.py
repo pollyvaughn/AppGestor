@@ -1,3 +1,4 @@
+from datetime import date
 from pydantic import BaseModel
 
 
@@ -10,3 +11,4 @@ class PagoCrear(BaseModel):
     cuota_id: int
     monto: float
     metodos: list[PagoMetodo]
+    fecha: date | None = None

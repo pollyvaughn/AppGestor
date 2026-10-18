@@ -1,7 +1,24 @@
 from fastapi import HTTPException
 from backend.database import get_connection
+from datetime import date
 
 from backend.services.saldo_service import actualizar_saldo, revertir_saldo
+
+def validar_fecha_pago(fecha, fecha_compra):
+    if fecha is None:
+        return
+
+    if fecha > date.today():
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha del pago no puede ser futura"
+        )
+
+    if fecha < fecha_compra.date():
+        raise HTTPException(
+            status_code=400,
+            detail="El pago no puede ser anterior a la compra"
+        )
 
 def obtener_total_cuota(cursor, cuota_id):
     cursor.execute(
@@ -60,6 +77,7 @@ def crear_pago(pago, usuario_id):
                 c.numero,
                 c.compra_tarjeta_id,
                 ct.tarjeta_id,
+                ct.fecha_compra,
                 mp.moneda
             FROM cuota c
             INNER JOIN compra_tarjeta ct
@@ -92,6 +110,7 @@ def crear_pago(pago, usuario_id):
             )
 
         if pago.monto <= 0:
+            validar_fecha_pago(pago.fecha, cuota["fecha_compra"])
             raise HTTPException(
                 status_code=400,
                 detail="El monto debe ser mayor a 0"
@@ -205,14 +224,15 @@ def crear_pago(pago, usuario_id):
                 %s,
                 %s,
                 %s,
-                CURDATE()
+                COALESCE(%s, CURDATE())
             )
             """,
             (
                 usuario_id,
                 "Pago de cuota",
                 pago.monto,
-                cuota["moneda"]
+                cuota["moneda"],
+                pago.fecha
             )
         )
 
@@ -234,7 +254,7 @@ def crear_pago(pago, usuario_id):
                 %s,
                 %s,
                 %s,
-                CURDATE(),
+                COALESCE(%s, CURDATE()),
                 'CONFIRMADO'
             )
             """,
@@ -242,7 +262,8 @@ def crear_pago(pago, usuario_id):
                 pago.cuota_id,
                 movimiento_id,
                 pago.monto,
-                cuota["moneda"]
+                cuota["moneda"],
+                pago.fecha
             )
         )
 
@@ -345,10 +366,13 @@ def editar_pago(pago_id, pago, usuario_id):
                 c.monto_pendiente,
                 c.estado AS cuota_estado,
                 c.compra_tarjeta_id,
-                c.numero
+                c.numero,
+                ct.fecha_compra
             FROM pago p
             INNER JOIN cuota c
                 ON p.cuota_id = c.id
+            INNER JOIN compra_tarjeta ct
+                ON c.compra_tarjeta_id = ct.id
             INNER JOIN movimiento m
                 ON p.movimiento_id = m.id
             WHERE p.id = %s
@@ -382,6 +406,7 @@ def editar_pago(pago_id, pago, usuario_id):
             )
 
         if pago.monto <= 0:
+            validar_fecha_pago(pago.fecha, pago_actual["fecha_compra"])
             raise HTTPException(
                 status_code=400,
                 detail="El monto debe ser mayor a 0"
@@ -573,12 +598,14 @@ def editar_pago(pago_id, pago, usuario_id):
             UPDATE movimiento
             SET
                 monto = %s,
-                moneda = %s
+                moneda = %s,
+                fecha = COALESCE(%s, fecha)
             WHERE id = %s
             """,
             (
                 pago.monto,
                 moneda,
+                pago.fecha,
                 pago_actual["movimiento_id"]
             )
         )
@@ -765,11 +792,19 @@ def anular_pago(pago_id, usuario_id):
 
         cursor.execute(
             """
-            UPDATE movimiento
-            SET estado = 'ANULADO'
+            UPDATE pago
+            SET
+                monto = %s,
+                moneda = %s,
+                fecha = COALESCE(%s, fecha)
             WHERE id = %s
             """,
-            (pago_actual["movimiento_id"],)
+            (
+                pago.monto,
+                moneda,
+                pago.fecha,
+                pago_id
+            )
         )
 
         # Actualizar el pendiente y estado de la cuota.

@@ -8,6 +8,8 @@ import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import { formatearMonto } from "../lib/moneda"
 import type { Cuenta, Cuota, Pago } from "./utilTarjetas"
+import Input from "../components/ui/Input"
+import { fechaHoy } from "../lib/fechas"
 
 type PagoCuotaModalProps = {
     cuota: Cuota | null
@@ -38,6 +40,7 @@ export default function PagoCuotaModal({
     const [cuenta2, setCuenta2] = useState("")
     const [error, setError] = useState("")
     const [guardando, setGuardando] = useState(false)
+    const [fecha, setFecha] = useState(fechaHoy())
 
     // cada vez que se abre para otra cuota o pago, se rearma el formulario
     useEffect(
@@ -55,10 +58,12 @@ export default function PagoCuotaModal({
                 setMonto1("")
                 setDividir(false)
                 setCuenta2("")
+                setFecha(fechaHoy())
                 return
             }
 
             setMonto(String(Number(pago.monto)))
+            setFecha(pago.fecha.slice(0, 10))
             setCuenta1(String(pago.metodos[0]?.metodo_pago_id ?? ""))
             setMonto1(String(Number(pago.metodos[0]?.monto ?? 0)))
 
@@ -142,6 +147,11 @@ export default function PagoCuotaModal({
             return
         }
 
+        if (!fecha || fecha > fechaHoy()) {
+            setError("Elegí una fecha válida (no puede ser futura)")
+            return
+        }
+
         if (redondear(total) > maximo) {
             setError(
                 `El monto no puede superar ${formatearMonto(maximo, moneda)} ${moneda}`
@@ -207,9 +217,9 @@ export default function PagoCuotaModal({
 
         try {
             if (pago === null) {
-                await crearPago(cuota.id, redondear(total), metodos)
+                await crearPago(cuota.id, redondear(total), metodos, fecha)
             } else {
-                await editarPago(pago.id, cuota.id, redondear(total), metodos)
+                await editarPago(pago.id, cuota.id, redondear(total), metodos, fecha)
             }
 
             onGuardado()
@@ -278,6 +288,18 @@ export default function PagoCuotaModal({
                         moneda={moneda}
                         value={monto}
                         onChange={setMonto}
+                        required
+                    />
+
+                    <Input
+                        id="fecha-pago"
+                        label="Fecha del pago"
+                        type="date"
+                        max={fechaHoy()}
+                        value={fecha}
+                        onChange={function (e) {
+                            setFecha(e.target.value)
+                        }}
                         required
                     />
 

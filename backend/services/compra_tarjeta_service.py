@@ -238,7 +238,17 @@ def crear_compra_con_cursor(
     return compra_id, movimiento_id
 
 
-def crear_compra(compra, usuario_id, fecha_compra=None):
+def crear_compra(compra, usuario_id):
+    fecha_compra = compra.fecha_compra
+
+    if fecha_compra is not None:
+        if fecha_compra > date.today():
+            raise ValueError("La fecha de la compra no puede ser futura")
+
+        # si es hoy, se usa la hora actual (NOW()) para ordenar bien el día
+        if fecha_compra == date.today():
+            fecha_compra = None
+
     conexion = get_connection()
 
     try:
@@ -268,7 +278,6 @@ def crear_compra(compra, usuario_id, fecha_compra=None):
     finally:
         cursor.close()
         conexion.close()
-
 
 def listar_compras(usuario_id):
     conexion = get_connection()
