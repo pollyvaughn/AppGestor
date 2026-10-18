@@ -19,6 +19,7 @@ type LayoutProps = {
     vista: Vista
     onCambiarVista: (vista: Vista) => void
     onCerrarSesion: () => void
+    onNuevoMovimiento: () => void
     children: React.ReactNode
 }
 
@@ -26,6 +27,7 @@ export default function Layout({
     vista,
     onCambiarVista,
     onCerrarSesion,
+    onNuevoMovimiento,
     children,
 }: LayoutProps) {
     return (
@@ -88,9 +90,26 @@ export default function Layout({
                 </div>
             </header>
 
-            <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+            <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-24">
                 {children}
             </main>
+
+            <button
+                type="button"
+                onClick={onNuevoMovimiento}
+                aria-label="Nuevo movimiento"
+                className="fixed z-40 right-4 bottom-4 sm:right-6 sm:bottom-6 h-14 min-w-14 px-4 flex items-center justify-center gap-2 rounded-full text-sm font-medium"
+                style={{
+                    background: "var(--color-foreground)",
+                    color: "var(--color-background)",
+                    boxShadow: "0 4px 12px rgba(28,28,26,0.25)",
+                }}
+            >
+                <span className="text-2xl leading-none" aria-hidden="true">
+                    +
+                </span>
+                <span className="hidden sm:inline">Nuevo movimiento</span>
+            </button>
         </div>
     )
 }

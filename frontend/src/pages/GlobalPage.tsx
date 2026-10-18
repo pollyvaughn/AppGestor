@@ -77,7 +77,7 @@ type Categoria = {
     color: string | null
 }
 
-export default function GlobalPage() {
+export default function GlobalPage({ version = 0 }: { version?: number }) {
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
@@ -125,7 +125,7 @@ export default function GlobalPage() {
 
     useEffect(function () {
         cargar()
-    }, [])
+    }, [version])
 
     // ---------- Datos calculados ----------
 

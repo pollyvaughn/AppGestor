@@ -60,7 +60,7 @@ const formularioInicial: Formulario = {
     saldo: "0",
 }
 
-export default function CuentasPage() {
+export default function CuentasPage({ version = 0 }: { version?: number }) {
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [cargando, setCargando] = useState(true)
     const [modalAbierto, setModalAbierto] = useState(false)
@@ -99,7 +99,7 @@ export default function CuentasPage() {
 
     useEffect(function () {
         cargar()
-    }, [])
+    }, [version])
 
     function abrirNuevo() {
         setEditando(null)

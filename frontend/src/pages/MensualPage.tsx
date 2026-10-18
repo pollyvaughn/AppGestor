@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
     listarMovimientos,
-    crearMovimiento,
-    editarMovimiento,
     eliminarMovimiento,
 } from "../services/movimientoService"
 import { listarCategorias } from "../services/categoriaService"
@@ -17,20 +15,13 @@ import {
 } from "../lib/movimientos"
 import { formatearMonto } from "../lib/moneda"
 import Button from "../components/ui/Button"
-import Input from "../components/ui/Input"
-import Select from "../components/ui/Select"
-import MontoInput from "../components/ui/MontoInput"
-import Modal from "../components/ui/Modal"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
-import CategoriaShortcut from "../components/ui/CategoriaShortcut"
-
-import { avisoSaldo } from "../lib/saldo"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
-
+import { avisoSaldo } from "../lib/saldo"
 import TransferenciaModal from "../components/movimientos/TransferenciaModal"
-import CategoriaRapida from "../components/ui/CategoriaRapida"
+import MovimientoModal from "../components/movimientos/MovimientoModal"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -58,21 +49,10 @@ type FiltroCategoria = {
 
 type Cuenta = { id: number; nombre: string; tipo: string; moneda: string; saldo: number }
 type MensualPageProps = {
+    version?: number
     onIrATarjetas: () => void
     onIrACategorias: () => void
 }
-
-type Formulario = {
-    tipo: Tipo
-    categoriaId: string
-    cuentaId: string
-    moneda: string
-    monto: string
-    fecha: string
-    descripcion: string
-}
-
-const MONEDAS = ["PYG", "USD", "EUR", "ARS", "BRL"]
 
 const COLOR_POR_DEFECTO = "#7A7873"
 
@@ -111,30 +91,12 @@ function fechaCorta(fecha: string) {
     return `${dia}/${mes}/${anio}`
 }
 
-function fechaHoy() {
-    const h = new Date()
-    const mes = String(h.getMonth() + 1).padStart(2, "0")
-    const dia = String(h.getDate()).padStart(2, "0")
-    return `${h.getFullYear()}-${mes}-${dia}`
-}
-
 function textoOperaciones(cantidad: number) {
     return cantidad === 1 ? "1 operación" : `${cantidad} operaciones`
 }
 
-function formularioVacio(): Formulario {
-    return {
-        tipo: "EGRESO",
-        categoriaId: "",
-        cuentaId: "",
-        moneda: "PYG",
-        monto: "",
-        fecha: fechaHoy(),
-        descripcion: "",
-    }
-}
-
 export default function MensualPage({
+    version = 0,
     onIrATarjetas,
     onIrACategorias,
 }: MensualPageProps) {
@@ -153,11 +115,8 @@ export default function MensualPage({
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
-
-    const [modalAbierto, setModalAbierto] = useState(false)
     const [modalTransferencia, setModalTransferencia] = useState(false)
-    const [editando, setEditando] = useState<number | null>(null)
-    const [formulario, setFormulario] = useState<Formulario>(formularioVacio())
+    const [editando, setEditando] = useState<Movimiento | null>(null)
 
     // mes tiene la forma "2026-10": lo separamos en año y número de mes (1 a 12)
     const [anioSel, numeroMesSel] = mes.split("-").map(Number)
@@ -205,16 +164,9 @@ export default function MensualPage({
 
     useEffect(function () {
         cargar()
-    }, [])
+    }, [version])
 
     // ---------- Abrir el formulario ----------
-
-    function abrirNuevo() {
-        setEditando(null)
-        setFormulario(formularioVacio())
-        setError("")
-        setModalAbierto(true)
-    }
 
     function abrirTransferencia() {
         setError("")
@@ -223,129 +175,8 @@ export default function MensualPage({
     }
 
     function abrirEdicion(m: Movimiento) {
-        setEditando(m.id)
-        setFormulario({
-            tipo: m.tipo as Tipo,
-            categoriaId: m.categoria_id ? String(m.categoria_id) : "",
-            cuentaId: m.metodo_pago_id ? String(m.metodo_pago_id) : "",
-            moneda: m.moneda,
-            monto: String(Number(m.monto)),
-            fecha: m.fecha.slice(0, 10),
-            descripcion: m.descripcion ?? "",
-        })
         setError("")
-        setModalAbierto(true)
-    }
-
-    // ---------- Cambios dentro del formulario ----------
-
-    function cambiarTipo(tipo: Tipo) {
-        // al cambiar el tipo, la categoría anterior ya no sirve
-        setFormulario({ ...formulario, tipo: tipo, categoriaId: "" })
-    }
-
-    function cambiarCuenta(cuentaId: string) {
-        const cuenta = cuentas.find(function (c) {
-            return String(c.id) === cuentaId
-        })
-
-        setFormulario({
-            ...formulario,
-            cuentaId: cuentaId,
-            // si eligió cuenta, la moneda es la de la cuenta
-            moneda: cuenta ? cuenta.moneda : formulario.moneda,
-        })
-    }
-
-    function cambiarMoneda(moneda: string) {
-        setFormulario({
-            ...formulario,
-            moneda: moneda,
-            // guaraníes no tienen decimales
-            monto:
-                moneda === "PYG"
-                    ? String(Math.trunc(Number(formulario.monto || 0)))
-                    : formulario.monto,
-        })
-    }
-
-    // ---------- Guardar ----------
-
-    async function guardar(evento: React.FormEvent<HTMLFormElement>) {
-        evento.preventDefault()
-        setError("")
-        setMensaje("")
-
-        if (Number(formulario.monto) <= 0) {
-            setError("El monto debe ser mayor a 0")
-            return
-        }
-
-        if (formulario.tipo === "EGRESO") {
-            const cuenta = cuentas.find(function (c) {
-                return String(c.id) === formulario.cuentaId
-            })
-
-            if (cuenta) {
-                let disponible = Number(cuenta.saldo)
-
-                // al editar, el egreso original ya descontó de esta cuenta
-                const original =
-                    editando !== null
-                        ? movimientos.find(function (m) {
-                              return m.id === editando
-                          })
-                        : undefined
-
-                if (
-                    original &&
-                    original.tipo === "EGRESO" &&
-                    original.metodo_pago_id === cuenta.id
-                ) {
-                    disponible += Number(original.monto)
-                }
-
-                const aviso = avisoSaldo(
-                    cuenta.nombre,
-                    disponible,
-                    Number(formulario.monto),
-                    cuenta.moneda
-                )
-
-                if (aviso && !window.confirm(aviso)) {
-                    return
-                }
-            }
-        }
-
-        const datos = {
-            tipo: formulario.tipo,
-            categoria_id: Number(formulario.categoriaId) || null,
-            metodo_pago_id: Number(formulario.cuentaId) || null,
-            descripcion: formulario.descripcion || null,
-            monto: Number(formulario.monto),
-            moneda: formulario.moneda,
-            fecha: formulario.fecha || null,
-        }
-
-        try {
-            if (editando === null) {
-                await crearMovimiento(datos)
-                setMensaje("Movimiento creado")
-            } else {
-                await editarMovimiento(editando, datos)
-                setMensaje("Movimiento actualizado")
-            }
-
-            setModalAbierto(false)
-            await cargar()
-        } catch (e) {
-            setError(
-                e instanceof Error
-                    ? e.message
-                    : "No se pudo guardar el movimiento"
-            )
-        }
+        setEditando(m)
     }
 
     // ---------- Anular ----------
@@ -501,16 +332,6 @@ export default function MensualPage({
         return true
     })
 
-    const categoriasDelTipo = categorias.filter(function (c) {
-        return c.tipo === formulario.tipo
-    })
-
-    const cuentasUsables = cuentas.filter(function (c) {
-        return c.tipo !== "TARJETA_CREDITO"
-    })
-
-    const cuentaElegida = formulario.cuentaId !== ""
-
     // al cambiar de mes o de moneda, el filtro por categoría deja de aplicar
     useEffect(
         function () {
@@ -536,22 +357,6 @@ export default function MensualPage({
         setFiltro(tipo)
     }
 
-    // la categoría recién creada queda elegida en el formulario
-    async function categoriaCreada(id: number) {
-        try {
-            setCategorias(await listarCategorias())
-            setFormulario(function (anterior) {
-                return { ...anterior, categoriaId: String(id) }
-            })
-        } catch (e) {
-            setError(
-                e instanceof Error
-                    ? e.message
-                    : "No se pudieron recargar las categorías"
-            )
-        }
-    }
-
     // ---------- Pantalla ----------
 
     return (
@@ -566,10 +371,6 @@ export default function MensualPage({
                         onClick={abrirTransferencia}
                     >
                         Transferir
-                    </Button>
-
-                    <Button type="button" onClick={abrirNuevo}>
-                        + Nuevo movimiento
                     </Button>
                 </div>
             </div>
@@ -667,7 +468,7 @@ export default function MensualPage({
                 </div>
             </div>
 
-            {error && !modalAbierto && <Mensaje tipo="error">{error}</Mensaje>}
+            {error && <Mensaje tipo="error">{error}</Mensaje>}
             {mensaje && <Mensaje tipo="exito">{mensaje}</Mensaje>}
             {!cargando && <AlertaSaldoNegativo cuentas={cuentas} />}
             {cargando && <Cargando />}
@@ -675,7 +476,7 @@ export default function MensualPage({
             {!cargando && delMes.length === 0 && (
                 <section className="p-6" style={estiloCard}>
                     <EstadoVacio
-                        texto={`Sin movimientos en ${nombreMes(mes)}. Usá "+ Nuevo movimiento" para registrar el primero.`}
+                        texto={`Sin movimientos en ${nombreMes(mes)}. Usá el botón "+" para registrar el primero.`}
                     />
                 </section>
             )}
@@ -1271,167 +1072,18 @@ export default function MensualPage({
                 </>
             )}
 
-            <Modal
-                open={modalAbierto}
-                title={editando === null ? "Nuevo movimiento" : "Editar movimiento"}
+            <MovimientoModal
+                open={editando !== null}
+                movimiento={editando}
                 onClose={function () {
-                    setModalAbierto(false)
+                    setEditando(null)
                 }}
-            >
-                <form onSubmit={guardar} className="space-y-4">
-                    <Select
-                        id="tipo"
-                        label="Tipo"
-                        value={formulario.tipo}
-                        onChange={function (e) {
-                            cambiarTipo(e.target.value as Tipo)
-                        }}
-                    >
-                        <option value="EGRESO">Egreso</option>
-                        <option value="INGRESO">Ingreso</option>
-                    </Select>
-
-                    <Select
-                        id="categoria"
-                        label="Categoría"
-                        value={formulario.categoriaId}
-                        onChange={function (e) {
-                            setFormulario({ ...formulario, categoriaId: e.target.value })
-                        }}
-                        required
-                    >
-                        <option value="">Elegí una categoría</option>
-                        {categoriasDelTipo.map(function (c) {
-                            return (
-                                <option key={c.id} value={c.id}>
-                                    {c.nombre}
-                                </option>
-                            )
-                        })}
-                    </Select>
-                    <div className="flex justify-end">
-                        <CategoriaRapida
-                            tipo={formulario.tipo}
-                            onCreada={categoriaCreada}
-                        />
-                    </div>
-
-                    <Select
-                        id="cuenta"
-                        label="Cuenta"
-                        value={formulario.cuentaId}
-                        onChange={function (e) {
-                            cambiarCuenta(e.target.value)
-                        }}
-                        required
-                    >
-                        <option value="">Elegí una cuenta</option>
-                        {cuentasUsables.map(function (c) {
-                            return (
-                                <option key={c.id} value={c.id}>
-                                    {c.nombre} ({c.moneda})
-                                </option>
-                            )
-                        })}
-                    </Select>
-
-                    <div
-                        className="flex flex-wrap items-center justify-between gap-2 p-3"
-                        style={{
-                            background: "var(--color-muted)",
-                            borderRadius: "var(--radius-sm)",
-                        }}
-                    >
-                        <p
-                            className="text-xs flex-1"
-                            style={{ color: "var(--color-muted-foreground)" }}
-                        >
-                            Las compras con tarjeta se registran en la pestaña Tarjetas, donde se crean sus cuotas.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={function () {
-                                setModalAbierto(false)
-                                onIrATarjetas()
-                            }}
-                            className="text-xs underline min-h-11 md:min-h-0"
-                            style={{ color: "var(--color-foreground)" }}
-                        >
-                            Ir a Tarjetas
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {!cuentaElegida && (
-                            <Select
-                                id="moneda"
-                                label="Moneda"
-                                value={formulario.moneda}
-                                onChange={function (e) {
-                                    cambiarMoneda(e.target.value)
-                                }}
-                            >
-                                {MONEDAS.map(function (mon) {
-                                    return (
-                                        <option key={mon} value={mon}>
-                                            {mon}
-                                        </option>
-                                    )
-                                })}
-                            </Select>
-                        )}
-
-                        <MontoInput
-                            id="monto"
-                            label={`Monto (${formulario.moneda})`}
-                            moneda={formulario.moneda}
-                            value={formulario.monto}
-                            onChange={function (valor) {
-                                setFormulario({ ...formulario, monto: valor })
-                            }}
-                            required
-                        />
-                    </div>
-
-                    <Input
-                        id="fecha"
-                        label="Fecha"
-                        type="date"
-                        value={formulario.fecha}
-                        onChange={function (e) {
-                            setFormulario({ ...formulario, fecha: e.target.value })
-                        }}
-                        required
-                    />
-
-                    <Input
-                        id="descripcion"
-                        label="Descripción (opcional)"
-                        value={formulario.descripcion}
-                        onChange={function (e) {
-                            setFormulario({ ...formulario, descripcion: e.target.value })
-                        }}
-                    />
-
-                    {error && <Mensaje tipo="error">{error}</Mensaje>}
-
-                    <div className="flex gap-2 pt-1">
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            className="flex-1"
-                            onClick={function () {
-                                setModalAbierto(false)
-                            }}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button type="submit" className="flex-1">
-                            Guardar
-                        </Button>
-                    </div>
-                </form>
-            </Modal>
+                onGuardado={function (texto) {
+                    setMensaje(texto)
+                    cargar()
+                }}
+                onIrATarjetas={onIrATarjetas}
+            />
             <TransferenciaModal
                 open={modalTransferencia}
                 cuentas={cuentas}

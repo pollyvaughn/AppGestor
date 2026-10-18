@@ -15,6 +15,7 @@ import ConfiguracionInicialPage from "./pages/ConfiguracionInicialPage"
 import Cargando from "./components/ui/Cargando"
 import Mensaje from "./components/ui/Mensaje"
 import Button from "./components/ui/Button"
+import MovimientoModal from "./components/movimientos/MovimientoModal"
 
 type EstadoConfiguracion = "cargando" | "requerida" | "completa" | "error"
 type CuentaConfiguracion = { tipo: string }
@@ -29,6 +30,9 @@ export default function App() {
 
         return JSON.parse(usuarioGuardado)
     })
+    const [modalMovimiento, setModalMovimiento] = useState(false)
+    const [versionDatos, setVersionDatos] = useState(0)
+    const [aviso, setAviso] = useState("")
 
     const [mostrarRegistro, setMostrarRegistro] = useState(false)
     const [vista, setVista] = useState<Vista>("mensual")
@@ -36,6 +40,23 @@ export default function App() {
         useState<EstadoConfiguracion>("cargando")
     const [errorConfiguracion, setErrorConfiguracion] = useState("")
     const [intentoConfiguracion, setIntentoConfiguracion] = useState(0)
+
+    useEffect(
+        function () {
+            if (!aviso) {
+                return
+            }
+
+            const temporizador = setTimeout(function () {
+                setAviso("")
+            }, 4000)
+
+            return function () {
+                clearTimeout(temporizador)
+            }
+        },
+        [aviso]
+    )
 
     useEffect(
         function () {
@@ -151,38 +172,68 @@ export default function App() {
     }
 
     return (
-        <Layout
-            vista={vista}
-            onCambiarVista={setVista}
-            onCerrarSesion={cerrarSesion}
-        >
-            {vista === "global" && <GlobalPage />}
-            {vista === "mensual" && (
-                <MensualPage
-                    onIrATarjetas={function () {
-                        setVista("tarjetas")
-                    }}
-                    onIrACategorias={function () {
-                        setVista("categorias")
-                    }}
-                />
-            )}
-            {vista === "tarjetas" && (
-                <TarjetasYComprasPage
-                    onIrACategorias={function () {
-                        setVista("categorias")
-                    }}
-                />
-            )}
-            {vista === "recurrentes" && (
-                <RecurrentesPage
-                    onIrACategorias={function () {
-                        setVista("categorias")
-                    }}
-                />
-            )}
-            {vista === "categorias" && <CategoriasPage />}
-            {vista === "cuentas" && <CuentasPage />}
-        </Layout>
+        <>
+            <Layout
+                vista={vista}
+                onCambiarVista={setVista}
+                onCerrarSesion={cerrarSesion}
+                onNuevoMovimiento={function () {
+                    setModalMovimiento(true)
+                }}
+            >
+                {aviso && (
+                    <div className="mb-4">
+                        <Mensaje tipo="exito">{aviso}</Mensaje>
+                    </div>
+                )}
+
+                {vista === "global" && <GlobalPage version={versionDatos} />}
+                {vista === "mensual" && (
+                    <MensualPage
+                        version={versionDatos}
+                        onIrATarjetas={function () {
+                            setVista("tarjetas")
+                        }}
+                        onIrACategorias={function () {
+                            setVista("categorias")
+                        }}
+                    />
+                )}
+                {vista === "tarjetas" && (
+                    <TarjetasYComprasPage
+                        onIrACategorias={function () {
+                            setVista("categorias")
+                        }}
+                    />
+                )}
+                {vista === "recurrentes" && (
+                    <RecurrentesPage
+                        onIrACategorias={function () {
+                            setVista("categorias")
+                        }}
+                    />
+                )}
+                {vista === "categorias" && <CategoriasPage />}
+                {vista === "cuentas" && <CuentasPage version={versionDatos} />}
+            </Layout>
+
+            <MovimientoModal
+                open={modalMovimiento}
+                movimiento={null}
+                onClose={function () {
+                    setModalMovimiento(false)
+                }}
+                onGuardado={function (mensaje) {
+                    setAviso(mensaje)
+                    // las vistas que muestran saldos y movimientos se recargan
+                    setVersionDatos(function (v) {
+                        return v + 1
+                    })
+                }}
+                onIrATarjetas={function () {
+                    setVista("tarjetas")
+                }}
+            />
+        </>
     )
 }
