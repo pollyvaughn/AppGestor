@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from backend.database import get_connection
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routes.categorias import router as categorias_router
@@ -16,6 +16,13 @@ from backend.routes.ajustes import router as ajustes_router
 from backend.routes.presupuestos import router as presupuestos_router
 
 app = FastAPI(title="Finanzas API")
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(ValueError)
+async def valor_invalido(request: Request, error: ValueError):
+    return JSONResponse(status_code=400, content={"detail": str(error)})
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,22 +52,3 @@ app.include_router(usuarios_router)
 @app.get("/")
 def inicio():
     return {"mensaje": "API de Finanzas funcionando"}
-
-
-@app.get("/db-test")
-def probar_conexion():
-    conexion = get_connection()
-
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("SELECT 1")
-        resultado = cursor.fetchone()
-
-        return {
-            "conexion": "ok",
-            "resultado": resultado[0]
-        }
-
-    finally:
-        cursor.close()
-        conexion.close()

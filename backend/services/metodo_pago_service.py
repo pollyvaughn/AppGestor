@@ -107,134 +107,41 @@ def listar_metodos_pago(usuario_id):
 
 
 def editar_metodo_pago(metodo_id, metodo, usuario_id):
+    if metodo.tipo == "TARJETA_CREDITO":
+        raise HTTPException(
+            status_code=400,
+            detail="Las tarjetas se administran desde la pestaña Tarjetas"
+        )
+
     conexion = get_connection()
 
     try:
-        cursor = conexion.cursor(dictionary=True)
-
-        conexion.start_transaction()
+        cursor = conexion.cursor()
 
         cursor.execute(
             """
-            SELECT tipo, moneda, saldo
-            FROM metodo_pago
-            WHERE id = %s
-            AND usuario_id = %s
-            AND estado = 'ACTIVO'
-            FOR UPDATE
-            """,
-            (metodo_id, usuario_id)
-        )
-
-        actual = cursor.fetchone()
-
-        if not actual:
-            return 0
-
-        # Cambiar la moneda de una cuenta con movimientos dejaría el
-        # historial en una moneda distinta a la de la cuenta.
-        if metodo.moneda != actual["moneda"]:
-            cursor.execute(
-                """
-                SELECT id
-                FROM movimiento
-                WHERE metodo_pago_id = %s
-                LIMIT 1
-                """,
-                (metodo_id,)
-            )
-
-            tiene_movimientos = cursor.fetchone()
-
-            if not tiene_movimientos:
-                cursor.execute(
-                    """
-                    SELECT id
-                    FROM movimiento_metodo
-                    WHERE metodo_pago_id = %s
-                    LIMIT 1
-                    """,
-                    (metodo_id,)
-                )
-
-                tiene_movimientos = cursor.fetchone()
-
-            if tiene_movimientos:
-                raise HTTPException(
-                    status_code=400,
-                    detail="No se puede cambiar la moneda de una cuenta que ya tiene movimientos"
-                )
-
-        sql = """
             UPDATE metodo_pago
             SET tipo = %s,
                 nombre = %s,
                 moneda = %s,
                 saldo = %s
             WHERE id = %s
-            AND usuario_id = %s
-            AND estado = 'ACTIVO'
-        """
-
-        valores = (
-            metodo.tipo,
-            metodo.nombre,
-            metodo.moneda,
-            metodo.saldo,
-            metodo_id,
-            usuario_id
-        )
-
-        cursor.execute(sql, valores)
-
-        # Si el saldo cambió a mano, queda registrado como un ajuste
-        # (no cuenta como ingreso ni gasto). El monto es la diferencia
-        # en positivo; el sentido se lee en la descripción.
-        saldo_anterior = actual["saldo"]
-        saldo_nuevo = Decimal(str(metodo.saldo)).quantize(Decimal("0.01"))
-        diferencia = saldo_nuevo - saldo_anterior
-
-        if diferencia != 0 and actual["tipo"] != "TARJETA_CREDITO":
-            cursor.execute(
-                """
-                INSERT INTO movimiento
-                (
-                    usuario_id,
-                    categoria_id,
-                    metodo_pago_id,
-                    tipo,
-                    estado,
-                    descripcion,
-                    monto,
-                    moneda,
-                    fecha
-                )
-                VALUES (
-                    %s,
-                    NULL,
-                    %s,
-                    'AJUSTE',
-                    'CONFIRMADO',
-                    %s,
-                    %s,
-                    %s,
-                    NOW()
-                )
-                """,
-                (
-                    usuario_id,
-                    metodo_id,
-                    f"Ajuste de saldo: de {saldo_anterior} a {saldo_nuevo}",
-                    abs(diferencia),
-                    metodo.moneda
-                )
+              AND usuario_id = %s
+              AND estado = 'ACTIVO'
+              AND tipo != 'TARJETA_CREDITO'
+            """,
+            (
+                metodo.tipo,
+                metodo.nombre,
+                metodo.moneda,
+                metodo.saldo,
+                metodo_id,
+                usuario_id
             )
-
+        )
         conexion.commit()
 
-        # Siempre 1: la cuenta existe aunque no haya cambiado nada
-        # (rowcount valdría 0 y la ruta diría "no encontrado").
-        return 1
+        return cursor.rowcount
 
     except Exception:
         conexion.rollback()

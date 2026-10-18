@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth.dependencies import obtener_usuario_actual
 from backend.models.metodo_pago import (
@@ -52,9 +52,7 @@ def editar(
     )
 
     if resultado == 0:
-        return {
-            "mensaje": "Método de pago no encontrado"
-        }
+        raise HTTPException(status_code=404, detail="Método de pago no encontrado")
 
     return {
         "mensaje": "Método de pago actualizado"
@@ -72,9 +70,7 @@ def eliminar(
     )
 
     if resultado == 0:
-        return {
-            "mensaje": "Método de pago no encontrado"
-        }
+        raise HTTPException(status_code=404, detail="Método de pago no encontrado")
 
     return {
         "mensaje": "Método de pago desactivado"

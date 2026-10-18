@@ -2,6 +2,17 @@ from fastapi import HTTPException
 from backend.database import get_connection
 from backend.services.saldo_service import actualizar_saldo, revertir_saldo
 
+def pertenece_a_tarjeta(cursor, movimiento_id):
+    cursor.execute(
+        """
+        SELECT
+            EXISTS(SELECT 1 FROM compra_tarjeta WHERE movimiento_id = %s)
+            OR EXISTS(SELECT 1 FROM pago WHERE movimiento_id = %s)
+            AS es_de_tarjeta
+        """,
+        (movimiento_id, movimiento_id)
+    )
+    return bool(cursor.fetchone()["es_de_tarjeta"])
 
 def crear_movimiento(movimiento, usuario_id):
     if movimiento.tipo in ("INGRESO", "EGRESO"):
@@ -195,6 +206,9 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
         if not movimiento_actual:
             return False, "Movimiento no encontrado"
 
+        if pertenece_a_tarjeta(cursor, movimiento_id):
+            return False, "Las compras y pagos de tarjeta se administran desde Tarjetas"
+
         if movimiento_actual["tipo"] in ("SALDO_INICIAL", "AJUSTE", "PAGO_TARJETA"):
             return False, "Este movimiento lo genera el sistema y no se puede editar"
         # Verificar categoría
@@ -333,6 +347,12 @@ def eliminar_movimiento(movimiento_id, usuario_id):
 
         if not movimiento:
             return 0
+
+        if pertenece_a_tarjeta(cursor, movimiento_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Las compras y pagos de tarjeta se administran desde Tarjetas"
+            )
 
         if movimiento["tipo"] in ("SALDO_INICIAL", "AJUSTE", "PAGO_TARJETA"):
             raise HTTPException(

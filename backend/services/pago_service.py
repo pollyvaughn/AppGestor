@@ -66,11 +66,15 @@ def crear_pago(pago, usuario_id):
                 ON c.compra_tarjeta_id = ct.id
             INNER JOIN tarjeta_credito tc
                 ON ct.tarjeta_id = tc.id
-            INNER JOIN metodo_pago mp
+                       INNER JOIN metodo_pago mp
                 ON tc.metodo_pago_id = mp.id
+            INNER JOIN movimiento m
+                ON ct.movimiento_id = m.id
             WHERE c.id = %s
+              AND m.usuario_id = %s
+            FOR UPDATE
             """,
-            (pago.cuota_id,)
+            (pago.cuota_id, usuario_id)
         )
 
         cuota = cursor.fetchone()
