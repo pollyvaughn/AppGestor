@@ -1,8 +1,19 @@
 USE finanzas;
 
+-- =========================================================
 -- Datos de demostración para AppGestor.
--- No borra datos existentes y se puede volver a ejecutar sin duplicar los
--- registros de esta demo.
+--
+-- Ejecutar DESPUÉS de database/schema.sql.
+-- No borra datos existentes y se puede volver a ejecutar sin
+-- duplicar los registros de esta demo.
+--
+-- Los saldos de las cuentas son coherentes con los movimientos:
+--   saldo actual = saldo inicial + ingresos - gastos
+--
+--   Cuenta principal:  1.000.000 + 34.420.000 = 35.420.000
+--   Billetera diaria:    500.000 +  1.110.000 =  1.610.000
+--   Efectivo:          2.500.000 -  1.988.000 =    512.000
+-- =========================================================
 
 START TRANSACTION;
 
@@ -48,22 +59,23 @@ WHERE NOT EXISTS (
 );
 
 SET @categoria_tecnologia_id = (
-      SELECT id
-      FROM categoria
-      WHERE usuario_id = @demo_usuario_id
-        AND nombre = 'Tecnología'
-        AND tipo = 'EGRESO'
-        AND estado = TRUE
-      ORDER BY id
-      LIMIT 1
+    SELECT id
+    FROM categoria
+    WHERE usuario_id = @demo_usuario_id
+      AND nombre = 'Tecnología'
+      AND tipo = 'EGRESO'
+      AND estado = TRUE
+    ORDER BY id
+    LIMIT 1
 );
 
+-- Saldos actuales (ver la cuenta en el encabezado)
 INSERT INTO metodo_pago (usuario_id, tipo, nombre, moneda, estado, saldo)
 SELECT @demo_usuario_id, datos.tipo, datos.nombre, datos.moneda, 'ACTIVO', datos.saldo
 FROM (
-    SELECT 'CUENTA_BANCARIA' AS tipo, 'Cuenta principal' AS nombre, 'PYG' AS moneda, 8500000 AS saldo
-    UNION ALL SELECT 'BILLETERA', 'Billetera diaria', 'PYG', 420000
-    UNION ALL SELECT 'EFECTIVO', 'Efectivo', 'PYG', 180000
+    SELECT 'CUENTA_BANCARIA' AS tipo, 'Cuenta principal' AS nombre, 'PYG' AS moneda, 35420000 AS saldo
+    UNION ALL SELECT 'BILLETERA', 'Billetera diaria', 'PYG', 1610000
+    UNION ALL SELECT 'EFECTIVO', 'Efectivo', 'PYG', 512000
     UNION ALL SELECT 'TARJETA_CREDITO', 'Visa Demo', 'PYG', 0
 ) AS datos
 WHERE NOT EXISTS (
@@ -94,40 +106,6 @@ SET @visa_metodo_id = (
     ORDER BY id LIMIT 1
 );
 
--- Saldo inicial de las cuentas de la demo. No cuenta como ingreso.
--- Se fecha en el primer mes de la demo (hace cinco meses), antes del resto
--- de los movimientos. Los montos son los mismos con que se crean las cuentas.
-INSERT INTO movimiento (
-    usuario_id, categoria_id, metodo_pago_id, tipo, estado,
-    descripcion, monto, moneda, fecha
-)
-SELECT
-    @demo_usuario_id,
-    NULL,
-    mp.id,
-    'SALDO_INICIAL',
-    'CONFIRMADO',
-    'Saldo inicial',
-    datos.monto,
-    mp.moneda,
-    DATE_SUB(CAST(DATE_FORMAT(CURDATE(), '%Y-%m-01') AS DATE), INTERVAL 5 MONTH)
-FROM (
-    SELECT 'Cuenta principal' AS nombre, 8500000 AS monto
-    UNION ALL SELECT 'Billetera diaria', 420000
-    UNION ALL SELECT 'Efectivo', 180000
-) AS datos
-INNER JOIN metodo_pago mp
-    ON mp.usuario_id = @demo_usuario_id
-   AND mp.nombre = datos.nombre
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM movimiento existente
-    WHERE existente.usuario_id = @demo_usuario_id
-      AND existente.metodo_pago_id = mp.id
-      AND existente.tipo = 'SALDO_INICIAL'
-);
-
-
 INSERT INTO cuenta_bancaria (metodo_pago_id, tipo_cuenta, banco, numero_referencia)
 SELECT @cuenta_principal_id, 'AHORRO', 'Banco Demo', '**** 4821'
 WHERE NOT EXISTS (
@@ -146,6 +124,38 @@ WHERE NOT EXISTS (
 SET @visa_id = (
     SELECT id FROM tarjeta_credito
     WHERE metodo_pago_id = @visa_metodo_id
+);
+
+-- Saldo inicial de las cuentas. No cuenta como ingreso. Se fecha el día 1
+-- del primer mes de la demo, antes del resto de los movimientos.
+INSERT INTO movimiento (
+    usuario_id, categoria_id, metodo_pago_id, tipo, estado,
+    descripcion, monto, moneda, fecha
+)
+SELECT
+    @demo_usuario_id,
+    NULL,
+    mp.id,
+    'SALDO_INICIAL',
+    'CONFIRMADO',
+    'Saldo inicial',
+    datos.monto,
+    mp.moneda,
+    DATE_SUB(CAST(DATE_FORMAT(CURDATE(), '%Y-%m-01') AS DATE), INTERVAL 5 MONTH)
+FROM (
+    SELECT 'Cuenta principal' AS nombre, 1000000 AS monto
+    UNION ALL SELECT 'Billetera diaria', 500000
+    UNION ALL SELECT 'Efectivo', 2500000
+) AS datos
+INNER JOIN metodo_pago mp
+    ON mp.usuario_id = @demo_usuario_id
+   AND mp.nombre = datos.nombre
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM movimiento existente
+    WHERE existente.usuario_id = @demo_usuario_id
+      AND existente.metodo_pago_id = mp.id
+      AND existente.tipo = 'SALDO_INICIAL'
 );
 
 -- Movimientos de los últimos seis meses. Las fechas se calculan desde el mes
@@ -228,12 +238,7 @@ WHERE NOT EXISTS (
 );
 
 -- Compra en cuotas para que también haya datos en la sección de tarjetas.
-UPDATE movimiento
-SET categoria_id = @categoria_tecnologia_id
-WHERE usuario_id = @demo_usuario_id
-  AND descripcion = 'Notebook en cuotas'
-  AND categoria_id IS NULL;
-
+-- Es un gasto de la tarjeta: no toca el saldo de ninguna cuenta.
 INSERT INTO movimiento (
     usuario_id, categoria_id, metodo_pago_id, tipo, estado, descripcion,
     monto, moneda, fecha
@@ -328,6 +333,16 @@ WHERE NOT EXISTS (
     FROM recurrente r
     WHERE r.usuario_id = @demo_usuario_id
       AND r.nombre = datos.nombre
+);
+
+-- Tope mensual de gasto de ejemplo (gráfico "Ritmo de gasto del mes")
+INSERT INTO presupuesto (usuario_id, moneda, tope_mensual)
+SELECT @demo_usuario_id, 'PYG', 3500000
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM presupuesto
+    WHERE usuario_id = @demo_usuario_id
+      AND moneda = 'PYG'
 );
 
 COMMIT;

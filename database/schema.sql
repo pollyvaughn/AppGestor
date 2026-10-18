@@ -1,4 +1,15 @@
-CREATE DATABASE IF NOT EXISTS finanzas
+-- =========================================================
+-- AppGestor - esquema de la base de datos
+--
+-- ATENCIÓN: este archivo BORRA la base "finanzas" completa y la
+-- vuelve a crear desde cero. Es lo que queremos para la demo:
+-- ejecutar este archivo y después database/seed.sql deja todo listo.
+-- No lo ejecutes si tenés datos que quieras conservar.
+-- =========================================================
+
+DROP DATABASE IF EXISTS finanzas;
+
+CREATE DATABASE finanzas
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 
@@ -148,6 +159,13 @@ CREATE TABLE tarjeta_credito (
 
 -- =========================================================
 -- MOVIMIENTOS
+--
+-- Tipos:
+--   INGRESO / EGRESO  -> los únicos que cuentan en los reportes
+--   SALDO_INICIAL     -> lo crea el sistema al crear una cuenta con saldo
+--   AJUSTE            -> lo crea el sistema al editar a mano el saldo
+--   PAGO_TARJETA      -> lo crea el sistema al pagar una cuota
+--   TRANSFERENCIA     -> reservado
 -- =========================================================
 
 CREATE TABLE movimiento (
@@ -421,8 +439,8 @@ CREATE TABLE ajuste (
     descripcion VARCHAR(255),
 
     estado ENUM(
-    'ACTIVO',
-    'ANULADO'
+        'ACTIVO',
+        'ANULADO'
     ) NOT NULL DEFAULT 'ACTIVO',
 
     fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -545,6 +563,43 @@ CREATE TABLE movimiento_recurrente (
 
 
 -- =========================================================
+-- PRESUPUESTO
+-- Tope mensual de gasto por usuario y moneda
+-- (gráfico "Ritmo de gasto del mes" de la pantalla Global)
+-- =========================================================
+
+CREATE TABLE presupuesto (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    usuario_id INT NOT NULL,
+
+    moneda ENUM(
+        'PYG',
+        'USD',
+        'EUR',
+        'ARS',
+        'BRL'
+    ) NOT NULL,
+
+    tope_mensual DECIMAL(15,2) NOT NULL,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_presupuesto_usuario
+        FOREIGN KEY (usuario_id)
+        REFERENCES usuario(id),
+
+    CONSTRAINT uq_presupuesto_usuario_moneda
+        UNIQUE (usuario_id, moneda),
+
+    CONSTRAINT chk_presupuesto_tope
+        CHECK (tope_mensual > 0)
+);
+
+
+-- =========================================================
 -- ADJUNTOS
 -- =========================================================
 
@@ -610,40 +665,6 @@ CREATE TABLE anulacion (
         )
 );
 
--- =========================================================
--- PRESUPUESTO
--- Tope mensual de gasto por usuario y moneda
--- =========================================================
-
-CREATE TABLE presupuesto (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-
-    usuario_id INT NOT NULL,
-
-    moneda ENUM(
-        'PYG',
-        'USD',
-        'EUR',
-        'ARS',
-        'BRL'
-    ) NOT NULL,
-
-    tope_mensual DECIMAL(15,2) NOT NULL,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_presupuesto_usuario
-        FOREIGN KEY (usuario_id)
-        REFERENCES usuario(id),
-
-    CONSTRAINT uq_presupuesto_usuario_moneda
-        UNIQUE (usuario_id, moneda),
-
-    CONSTRAINT chk_presupuesto_tope
-        CHECK (tope_mensual > 0)
-);
 
 -- =========================================================
 -- INDICES
