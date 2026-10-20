@@ -292,13 +292,15 @@ SELECT q.id,NULL,'RECARGO',15000,'PYG','Recargo de mora por pago posterior al ve
 FROM cuota q WHERE q.compra_tarjeta_id=@compra_lavadora AND q.numero=3;
 
 -- Recurrentes activos e inactivos para poblar la sección correspondiente.
+-- Streaming, supermercado, cursos y farmacia tienen proxima_fecha <= 2026-10-20
+-- y no poseen un movimiento generado para ese periodo: se pueden generar desde el botón.
 INSERT INTO recurrente (usuario_id,categoria_id,metodo_pago_id,nombre,tipo,monto_base,moneda,frecuencia,proxima_fecha,estado) VALUES
 (@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Salario' LIMIT 1),@bank,'Salario mensual','INGRESO',7400000,'PYG','MENSUAL','2026-11-05','ACTIVO'),
 (@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Servicios del hogar' LIMIT 1),@bank,'Internet y telefonía','EGRESO',185000,'PYG','MENSUAL','2026-11-19','ACTIVO'),
-(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Suscripciones' LIMIT 1),@wallet,'Streaming y música','EGRESO',79000,'PYG','MENSUAL','2026-10-24','ACTIVO'),
-(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Supermercado' LIMIT 1),@bank,'Presupuesto de supermercado','EGRESO',850000,'PYG','MENSUAL','2026-11-08','ACTIVO'),
-(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Educación' LIMIT 1),@visa_mp,'Plataforma de cursos','EGRESO',25,'USD','MENSUAL','2026-11-11','ACTIVO'),
-(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Salud y farmacia' LIMIT 1),@cash,'Vitaminas y farmacia','EGRESO',95000,'PYG','BIMESTRAL','2026-11-22','ACTIVO'),
+(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Suscripciones' LIMIT 1),@wallet,'Streaming y música','EGRESO',79000,'PYG','MENSUAL','2026-10-18','ACTIVO'),
+(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Supermercado' LIMIT 1),@bank,'Presupuesto de supermercado','EGRESO',850000,'PYG','MENSUAL','2026-10-08','ACTIVO'),
+(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Educación' LIMIT 1),@visa_mp,'Plataforma de cursos','EGRESO',25,'USD','MENSUAL','2026-10-11','ACTIVO'),
+(@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Salud y farmacia' LIMIT 1),@cash,'Vitaminas y farmacia','EGRESO',95000,'PYG','BIMESTRAL','2026-10-15','ACTIVO'),
 (@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Ocio y salidas' LIMIT 1),@wallet,'Club de lectura','EGRESO',65000,'PYG','MENSUAL','2026-11-03','INACTIVO');
 
 -- Dos recurrentes ya ejecutados para que la demo permita ver el flujo de pago.
