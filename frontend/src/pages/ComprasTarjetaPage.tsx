@@ -731,7 +731,7 @@ export default function ComprasTarjetaPage({
                     setModalNueva(false)
                 }}
             >
-                <form onSubmit={guardarNueva} className="space-y-4">
+                <form onSubmit={guardarNueva} autoComplete="off" className="space-y-4">
                     <Select
                         id="tarjeta"
                         label="Tarjeta"
@@ -900,7 +900,7 @@ export default function ComprasTarjetaPage({
                     setCompraEditando(null)
                 }}
             >
-                <form onSubmit={guardarEdicion} className="space-y-4">
+                <form onSubmit={guardarEdicion} autoComplete="off" className="space-y-4">
                     <p
                         className="text-xs"
                         style={{ color: "var(--color-muted-foreground)" }}

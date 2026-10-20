@@ -129,7 +129,7 @@ export default function RitmoGastoChart({
 
             {/* Tope mensual */}
             {mostrandoFormulario ? (
-                <form onSubmit={guardar} className="space-y-3">
+                <form onSubmit={guardar} autoComplete="off" className="space-y-3">
                     <MontoInput
                         id="tope-mensual"
                         label={`Tope mensual de gasto (${moneda})`}

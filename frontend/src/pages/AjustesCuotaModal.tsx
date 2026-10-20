@@ -284,7 +284,7 @@ export default function AjustesCuotaModal({
                         omitida o anulada.
                     </Mensaje>
                 ) : (
-                    <form onSubmit={agregar} className="space-y-4">
+                    <form onSubmit={agregar} autoComplete="off" className="space-y-4">
                         <p
                             className="text-xs"
                             style={{

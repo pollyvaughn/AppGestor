@@ -75,7 +75,7 @@ export default function ConfiguracionInicialPage({
                     </p>
                 </div>
 
-                <form onSubmit={guardar} className="space-y-4">
+                <form onSubmit={guardar} autoComplete="off" className="space-y-4">
                     <Select
                         id="tipo-cuenta-inicial"
                         label="Tipo de cuenta"

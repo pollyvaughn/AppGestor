@@ -35,7 +35,11 @@ export default function RegisterForm({ onRegister }: RegisterFormProps) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 w-full">
+        <form
+            onSubmit={handleSubmit}
+            autoComplete="off"
+            className="space-y-4 w-full"
+        >
             <h1 className="text-lg font-medium">Crear cuenta</h1>
 
             <Input

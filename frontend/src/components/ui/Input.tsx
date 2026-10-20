@@ -28,6 +28,7 @@ export default function Input({ label, id, style, ...props }: InputProps) {
             <input
                 id={inputId}
                 {...props}
+                autoComplete="off"
                 className="w-full px-2.5 py-2 text-base md:text-sm"
                 style={{
                     background: "var(--color-muted)",

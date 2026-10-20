@@ -331,7 +331,7 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
                     setModalAbierto(false)
                 }}
             >
-                <form onSubmit={guardar} className="space-y-4">
+                <form onSubmit={guardar} autoComplete="off" className="space-y-4">
                     <Select
                         id="tipo"
                         label="Tipo"
@@ -450,7 +450,7 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
                 }}
             >
                 {ajustando && (
-                    <form onSubmit={guardarAjuste} className="space-y-4">
+                    <form onSubmit={guardarAjuste} autoComplete="off" className="space-y-4">
                         <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
                             {ajustando.nombre} · saldo actual{" "}
                             {formatearMonto(Number(ajustando.saldo), ajustando.moneda)}{" "}

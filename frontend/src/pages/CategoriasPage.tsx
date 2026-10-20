@@ -248,7 +248,7 @@ export default function CategoriasPage() {
                     setModalAbierto(false)
                 }}
             >
-                <form onSubmit={guardar} className="space-y-4">
+                <form onSubmit={guardar} autoComplete="off" className="space-y-4">
                     <Input
                         id="nombre"
                         label="Nombre"

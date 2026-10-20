@@ -34,6 +34,7 @@ export default function Select({
             <select
                 id={selectId}
                 {...props}
+                autoComplete="off"
                 className="w-full px-2.5 py-2 text-base md:text-sm"
                 style={{
                     background: "var(--color-muted)",

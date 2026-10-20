@@ -295,7 +295,7 @@ export default function MovimientoModal({
             {cargando ? (
                 <Cargando />
             ) : (
-                <form onSubmit={guardar} className="space-y-4">
+                <form onSubmit={guardar} autoComplete="off" className="space-y-4">
                     <Select
                         id="tipo"
                         label="Tipo"

@@ -578,7 +578,7 @@ export default function RecurrentesPage() {
                     setModalAbierto(false)
                 }}
             >
-                <form onSubmit={guardar} className="space-y-4">
+                <form onSubmit={guardar} autoComplete="off" className="space-y-4">
                     <Input
                         id="nombre"
                         label="Nombre"
@@ -750,7 +750,7 @@ export default function RecurrentesPage() {
                 }}
             >
                 {generando && (
-                    <form onSubmit={confirmarGenerar} className="space-y-4">
+                    <form onSubmit={confirmarGenerar} autoComplete="off" className="space-y-4">
                         <p className="text-sm">
                             {generando.nombre}
                             <span

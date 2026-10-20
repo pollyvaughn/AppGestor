@@ -101,7 +101,7 @@ export default function CategoriaRapida({
                         setAbierto(false)
                     }}
                 >
-                    <form onSubmit={guardar} className="space-y-4">
+                    <form onSubmit={guardar} autoComplete="off" className="space-y-4">
                         <Input
                             id="categoria-rapida-nombre"
                             label="Nombre"

@@ -37,7 +37,11 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-sm">
+        <form
+            onSubmit={handleSubmit}
+            autoComplete="off"
+            className="space-y-4 w-full max-w-sm"
+        >
             <h1 className="text-lg font-medium">Iniciar sesión</h1>
 
             <Input

@@ -153,7 +153,7 @@ export default function TransferenciaModal({
                     </Button>
                 </div>
             ) : (
-                <form onSubmit={guardar} className="space-y-4">
+                <form onSubmit={guardar} autoComplete="off" className="space-y-4">
                     <p
                         className="text-xs"
                         style={{ color: "var(--color-muted-foreground)" }}
