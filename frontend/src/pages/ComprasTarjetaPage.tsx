@@ -658,7 +658,7 @@ export default function ComprasTarjetaPage({
 
                             {abierta && (
                                 <div
-                                    className="pt-3 space-y-2"
+                                    className="pt-3 space-y-2 max-h-96 overflow-y-auto"
                                     style={{
                                         borderTop:
                                             "1px solid var(--color-border)",
