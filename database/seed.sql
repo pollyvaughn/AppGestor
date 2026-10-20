@@ -301,6 +301,37 @@ INSERT INTO recurrente (usuario_id,categoria_id,metodo_pago_id,nombre,tipo,monto
 (@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Salud y farmacia' LIMIT 1),@cash,'Vitaminas y farmacia','EGRESO',95000,'PYG','BIMESTRAL','2026-11-22','ACTIVO'),
 (@uid,(SELECT id FROM categoria WHERE usuario_id=@uid AND nombre='Ocio y salidas' LIMIT 1),@wallet,'Club de lectura','EGRESO',65000,'PYG','MENSUAL','2026-11-03','INACTIVO');
 
+-- Dos recurrentes ya ejecutados para que la demo permita ver el flujo de pago.
+-- Se generan movimientos históricos (nunca del 20/10/2026 ni posteriores) y se
+-- vinculan con movimiento_recurrente para que aparezcan como pagos de recurrentes.
+INSERT INTO movimiento (usuario_id,categoria_id,metodo_pago_id,tipo,estado,descripcion,monto,moneda,fecha)
+SELECT r.usuario_id,r.categoria_id,r.metodo_pago_id,r.tipo,'CONFIRMADO',
+       'Pago recurrente: Salario mensual - octubre 2026',r.monto_base,r.moneda,'2026-10-05 09:00:00'
+FROM recurrente r
+WHERE r.usuario_id=@uid AND r.nombre='Salario mensual' AND r.estado='ACTIVO';
+
+INSERT INTO movimiento_recurrente (recurrente_id,movimiento_id,periodo,monto)
+SELECT r.id,m.id,'2026-10-01',m.monto
+FROM recurrente r
+JOIN movimiento m ON m.usuario_id=r.usuario_id
+  AND m.descripcion='Pago recurrente: Salario mensual - octubre 2026'
+  AND m.fecha='2026-10-05 09:00:00'
+WHERE r.usuario_id=@uid AND r.nombre='Salario mensual';
+
+INSERT INTO movimiento (usuario_id,categoria_id,metodo_pago_id,tipo,estado,descripcion,monto,moneda,fecha)
+SELECT r.usuario_id,r.categoria_id,r.metodo_pago_id,r.tipo,'CONFIRMADO',
+       'Pago recurrente: Internet y telefonía - octubre 2026',r.monto_base,r.moneda,'2026-10-19 10:30:00'
+FROM recurrente r
+WHERE r.usuario_id=@uid AND r.nombre='Internet y telefonía' AND r.estado='ACTIVO';
+
+INSERT INTO movimiento_recurrente (recurrente_id,movimiento_id,periodo,monto)
+SELECT r.id,m.id,'2026-10-01',m.monto
+FROM recurrente r
+JOIN movimiento m ON m.usuario_id=r.usuario_id
+  AND m.descripcion='Pago recurrente: Internet y telefonía - octubre 2026'
+  AND m.fecha='2026-10-19 10:30:00'
+WHERE r.usuario_id=@uid AND r.nombre='Internet y telefonía';
+
 -- Presupuestos para varias monedas.
 INSERT INTO presupuesto (usuario_id,moneda,tope_mensual) VALUES
 (@uid,'PYG',5200000),(@uid,'USD',350);
