@@ -1,5 +1,12 @@
-from pydantic import BaseModel, Field
+# =========================================================
+# Modelos de movimientos recurrentes
+# proxima_fecha: date -> fecha real "AAAA-MM-DD" (antes era str sin validar)
+# =========================================================
+
+from datetime import date
 from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class RecurrenteCrear(BaseModel):
@@ -19,7 +26,7 @@ class RecurrenteCrear(BaseModel):
         "SEMESTRAL",
         "ANUAL"
     ]
-    proxima_fecha: str | None = None
+    proxima_fecha: date | None = None
 
 
 class RecurrenteEditar(BaseModel):
@@ -39,4 +46,4 @@ class RecurrenteEditar(BaseModel):
         "SEMESTRAL",
         "ANUAL"
     ]
-    proxima_fecha: str | None = None
+    proxima_fecha: date | None = None
