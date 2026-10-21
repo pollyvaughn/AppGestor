@@ -1,9 +1,16 @@
+# =========================================================
+# Servicio de pagos de cuotas de tarjeta
+# Crear, editar, anular y listar pagos.
+# =========================================================
+
 from fastapi import HTTPException
 from backend.database import get_connection
 from datetime import date
 
 from backend.services.saldo_service import actualizar_saldo, revertir_saldo
 
+
+# Valida que la fecha del pago no sea futura ni anterior a la compra.
 def validar_fecha_pago(fecha, fecha_compra):
     if fecha is None:
         return
@@ -20,6 +27,9 @@ def validar_fecha_pago(fecha, fecha_compra):
             detail="El pago no puede ser anterior a la compra"
         )
 
+
+# Total de una cuota = monto base + ajustes activos
+# (recargo/interés/comisión/adicional suman, descuento resta).
 def obtener_total_cuota(cursor, cuota_id):
     cursor.execute(
         """
@@ -62,12 +72,18 @@ def obtener_total_cuota(cursor, cuota_id):
         + float(resultado["total_ajustes"])
     )
 
+
+# ---------------------------------------------------------
+# CREAR PAGO
+# ---------------------------------------------------------
 def crear_pago(pago, usuario_id):
     conexion = get_connection()
 
     try:
         cursor = conexion.cursor(dictionary=True)
 
+        # FOR UPDATE: bloquea la fila de la cuota hasta el commit
+        # para que dos pagos simultáneos no se pisen.
         cursor.execute(
             """
             SELECT
@@ -84,7 +100,7 @@ def crear_pago(pago, usuario_id):
                 ON c.compra_tarjeta_id = ct.id
             INNER JOIN tarjeta_credito tc
                 ON ct.tarjeta_id = tc.id
-                       INNER JOIN metodo_pago mp
+            INNER JOIN metodo_pago mp
                 ON tc.metodo_pago_id = mp.id
             INNER JOIN movimiento m
                 ON ct.movimiento_id = m.id
@@ -109,8 +125,11 @@ def crear_pago(pago, usuario_id):
                 detail="No se puede registrar un pago sobre una cuota pagada, omitida o anulada"
             )
 
+        # La fecha se valida siempre (no futura, no anterior a la compra).
+        validar_fecha_pago(pago.fecha, cuota["fecha_compra"])
+
+        # El modelo ya exige monto > 0; esto queda como segunda barrera.
         if pago.monto <= 0:
-            validar_fecha_pago(pago.fecha, cuota["fecha_compra"])
             raise HTTPException(
                 status_code=400,
                 detail="El monto debe ser mayor a 0"
@@ -140,6 +159,7 @@ def crear_pago(pago, usuario_id):
                     detail="El monto de cada método debe ser mayor a 0"
                 )
 
+        # Hay que pagar las cuotas en orden: ninguna anterior puede quedar debiendo.
         cursor.execute(
             """
             SELECT id, numero, estado
@@ -203,6 +223,7 @@ def crear_pago(pago, usuario_id):
                     detail="Los métodos de pago deben utilizar la misma moneda que la cuota"
                 )
 
+        # El pago es un movimiento de tipo PAGO_TARJETA (no suma como gasto).
         cursor.execute(
             """
             INSERT INTO movimiento
@@ -269,6 +290,7 @@ def crear_pago(pago, usuario_id):
 
         pago_id = cursor.lastrowid
 
+        # Qué cuentas pusieron plata en este pago (puede ser más de una).
         for metodo in pago.metodos:
             cursor.execute(
                 """
@@ -294,6 +316,7 @@ def crear_pago(pago, usuario_id):
                 )
             )
 
+        # Descuenta el saldo de cada cuenta usada.
         for metodo in pago.metodos:
             actualizar_saldo(
                 cursor,
@@ -348,6 +371,10 @@ def crear_pago(pago, usuario_id):
         cursor.close()
         conexion.close()
 
+
+# ---------------------------------------------------------
+# EDITAR PAGO
+# ---------------------------------------------------------
 def editar_pago(pago_id, pago, usuario_id):
     conexion = get_connection()
 
@@ -405,8 +432,11 @@ def editar_pago(pago_id, pago, usuario_id):
                 detail="No se puede editar un pago de una cuota omitida o anulada"
             )
 
+        # La fecha se valida siempre (no futura, no anterior a la compra).
+        validar_fecha_pago(pago.fecha, pago_actual["fecha_compra"])
+
+        # El modelo ya exige monto > 0; esto queda como segunda barrera.
         if pago.monto <= 0:
-            validar_fecha_pago(pago.fecha, pago_actual["fecha_compra"])
             raise HTTPException(
                 status_code=400,
                 detail="El monto debe ser mayor a 0"
@@ -492,6 +522,7 @@ def editar_pago(pago_id, pago, usuario_id):
                 status_code=404,
                 detail="Cuota no encontrada")
 
+        # Lo pagado por los OTROS pagos de la cuota (sin contar el que se edita).
         cursor.execute(
             """ 
             SELECT COALESCE(SUM(monto), 0) AS total_pagado 
@@ -542,6 +573,7 @@ def editar_pago(pago_id, pago, usuario_id):
 
         metodos_actuales = cursor.fetchall()
 
+        # Devuelve a las cuentas lo que había descontado el pago viejo...
         for metodo in metodos_actuales:
             revertir_saldo(
                 cursor,
@@ -585,6 +617,7 @@ def editar_pago(pago_id, pago, usuario_id):
                 )
             )
 
+        # ...y descuenta lo del pago nuevo.
         for metodo in pago.metodos:
             actualizar_saldo(
                 cursor,
@@ -664,6 +697,9 @@ def editar_pago(pago_id, pago, usuario_id):
         conexion.close()
 
 
+# ---------------------------------------------------------
+# ANULAR PAGO  (punto 1 del roadmap)
+# ---------------------------------------------------------
 def anular_pago(pago_id, usuario_id):
     conexion = get_connection()
 
@@ -780,7 +816,8 @@ def anular_pago(pago_id, usuario_id):
                 "EGRESO"
             )
 
-        # Marcar el pago y su movimiento como anulados.
+        # Marcar el pago y su movimiento como ANULADO.
+        # No se borran: quedan como historial (ver tabla anulacion).
         cursor.execute(
             """
             UPDATE pago
@@ -792,19 +829,11 @@ def anular_pago(pago_id, usuario_id):
 
         cursor.execute(
             """
-            UPDATE pago
-            SET
-                monto = %s,
-                moneda = %s,
-                fecha = COALESCE(%s, fecha)
+            UPDATE movimiento
+            SET estado = 'ANULADO'
             WHERE id = %s
             """,
-            (
-                pago.monto,
-                moneda,
-                pago.fecha,
-                pago_id
-            )
+            (pago_actual["movimiento_id"],)
         )
 
         # Actualizar el pendiente y estado de la cuota.
@@ -841,7 +870,6 @@ def anular_pago(pago_id, usuario_id):
             )
         )
 
-
         conexion.commit()
 
         return {
@@ -865,6 +893,10 @@ def anular_pago(pago_id, usuario_id):
         cursor.close()
         conexion.close()
 
+
+# ---------------------------------------------------------
+# LISTAR PAGOS DE UNA CUOTA (con las cuentas usadas en cada uno)
+# ---------------------------------------------------------
 def listar_pagos_por_cuota(cuota_id, usuario_id):
     conexion = get_connection()
 
