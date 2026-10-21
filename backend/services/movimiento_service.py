@@ -1,8 +1,16 @@
+# =========================================================
+# Servicio de movimientos (ingresos, egresos y transferencias)
+# Crear, listar, editar, anular y transferir entre cuentas.
+# =========================================================
+
 from fastapi import HTTPException
 from backend.database import get_connection
 from backend.services.saldo_service import actualizar_saldo, revertir_saldo
 from datetime import date
 
+
+# True si el movimiento es una compra con tarjeta o un pago de cuota:
+# esos se manejan desde la pestaña Tarjetas, no desde Mensual.
 def pertenece_a_tarjeta(cursor, movimiento_id):
     cursor.execute(
         """
@@ -15,6 +23,10 @@ def pertenece_a_tarjeta(cursor, movimiento_id):
     )
     return bool(cursor.fetchone()["es_de_tarjeta"])
 
+
+# ---------------------------------------------------------
+# CREAR MOVIMIENTO
+# ---------------------------------------------------------
 def crear_movimiento(movimiento, usuario_id):
     if movimiento.tipo not in ("INGRESO", "EGRESO"):
         return None, "Tipo de movimiento no permitido"
@@ -137,6 +149,10 @@ def crear_movimiento(movimiento, usuario_id):
         cursor.close()
         conexion.close()
 
+
+# ---------------------------------------------------------
+# LISTAR MOVIMIENTOS
+# ---------------------------------------------------------
 def listar_movimientos(usuario_id, categoria_id=None):
     conexion = get_connection()
 
@@ -185,12 +201,15 @@ def listar_movimientos(usuario_id, categoria_id=None):
         cursor.close()
         conexion.close()
 
+
+# ---------------------------------------------------------
+# EDITAR MOVIMIENTO  (punto 2 del roadmap)
+# ---------------------------------------------------------
 def editar_movimiento(movimiento_id, movimiento, usuario_id):
-    if movimiento_actual["tipo"] not in ("INGRESO", "EGRESO"):
-        return False, (
-            "Solo se pueden editar ingresos y egresos. "
-            "Para corregir, anulá y volvé a registrar"
-        )
+    # Validaciones sobre lo que llega (el movimiento NUEVO).
+    # Igual que en crear_movimiento: solo ingreso o egreso.
+    if movimiento.tipo not in ("INGRESO", "EGRESO"):
+        return False, "Tipo de movimiento no permitido"
 
     if movimiento.tipo in ("INGRESO", "EGRESO"):
         if movimiento.categoria_id is None:
@@ -220,14 +239,20 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
         if not movimiento_actual:
             return False, "Movimiento no encontrado"
 
+        # Validaciones sobre el movimiento ACTUAL (guardado en la base).
+        # Van después del SELECT porque dependen de movimiento_actual.
         if movimiento_actual["tipo"] in ("AJUSTE", "SALDO_INICIAL"):
             return False, "Los ajustes no se editan: para corregir, hacé otro ajuste de saldo"
 
         if pertenece_a_tarjeta(cursor, movimiento_id):
             return False, "Las compras y pagos de tarjeta se administran desde Tarjetas"
 
-        if movimiento_actual["tipo"] in ("SALDO_INICIAL", "AJUSTE", "PAGO_TARJETA"):
-            return False, "Este movimiento lo genera el sistema y no se puede editar"
+        if movimiento_actual["tipo"] not in ("INGRESO", "EGRESO"):
+            return False, (
+                "Solo se pueden editar ingresos y egresos. "
+                "Para corregir, anulá y volvé a registrar"
+            )
+
         # Verificar categoría
         if movimiento.categoria_id is not None:
             cursor.execute(
@@ -342,6 +367,9 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
         conexion.close()
 
 
+# ---------------------------------------------------------
+# ANULAR MOVIMIENTO
+# ---------------------------------------------------------
 def eliminar_movimiento(movimiento_id, usuario_id):
     conexion = get_connection()
 
@@ -428,6 +456,10 @@ def eliminar_movimiento(movimiento_id, usuario_id):
         cursor.close()
         conexion.close()
 
+
+# ---------------------------------------------------------
+# TRANSFERENCIA ENTRE CUENTAS (misma moneda, sin tarjetas)
+# ---------------------------------------------------------
 def crear_transferencia(datos, usuario_id):
     if datos.origen_id == datos.destino_id:
         raise ValueError(
