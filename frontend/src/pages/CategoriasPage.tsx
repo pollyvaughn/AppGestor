@@ -13,6 +13,7 @@ import ColorPicker from "../components/ui/ColorPicker"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
+import MenuAcciones from "../components/ui/MenuAcciones"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -108,9 +109,11 @@ export default function CategoriasPage() {
         }
     }
 
-    async function eliminar(categoria: Categoria) {
+    // El backend no borra la categoría: la marca como inactiva.
+    // Los movimientos anteriores siguen mostrándola.
+    async function desactivar(categoria: Categoria) {
         const confirmar = window.confirm(
-            `¿Eliminar la categoría "${categoria.nombre}"?`
+            `¿Desactivar la categoría "${categoria.nombre}"? Deja de aparecer al registrar movimientos, pero los movimientos anteriores la conservan.`
         )
 
         if (!confirmar) {
@@ -122,13 +125,13 @@ export default function CategoriasPage() {
 
         try {
             await eliminarCategoria(categoria.id)
-            setMensaje("Categoría eliminada")
+            setMensaje("Categoría desactivada")
             await cargar()
         } catch (e) {
             setError(
                 e instanceof Error
                     ? e.message
-                    : "No se pudo eliminar la categoría"
+                    : "No se pudo desactivar la categoría"
             )
         }
     }
@@ -184,30 +187,24 @@ export default function CategoriasPage() {
                                 </span>
                             </div>
 
-                            <div className="flex gap-2 shrink-0">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    aria-label={`Editar ${categoria.nombre}`}
-                                    className="!py-1 !text-xs"
-                                    onClick={function () {
-                                        abrirEdicion(categoria)
-                                    }}
-                                >
-                                    Editar
-                                </Button>
-
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    aria-label={`Eliminar ${categoria.nombre}`}
-                                    className="!py-1 !text-xs"
-                                    onClick={function () {
-                                        eliminar(categoria)
-                                    }}
-                                >
-                                    Eliminar
-                                </Button>
+                            <div className="shrink-0">
+                                <MenuAcciones
+                                    etiqueta={categoria.nombre}
+                                    acciones={[
+                                        {
+                                            label: "Editar",
+                                            onClick: function () {
+                                                abrirEdicion(categoria)
+                                            },
+                                        },
+                                        {
+                                            label: "Desactivar",
+                                            onClick: function () {
+                                                desactivar(categoria)
+                                            },
+                                        },
+                                    ]}
+                                />
                             </div>
                         </div>
                     )
