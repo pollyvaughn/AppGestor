@@ -15,6 +15,8 @@ import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
+import MenuAcciones from "../components/ui/MenuAcciones"
+import MovimientosCuentaModal from "../components/movimientos/MovimientosCuentaModal"
 import { formatearMonto } from "../lib/moneda"
 
 type TipoCuenta =
@@ -73,6 +75,9 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
     const [saldoReal, setSaldoReal] = useState("")
     const [motivo, setMotivo] = useState("")
     const [errorAjuste, setErrorAjuste] = useState("")
+
+    // cuenta cuyos movimientos se están viendo
+    const [viendo, setViendo] = useState<Cuenta | null>(null)
 
     const diferencia = ajustando
         ? Math.round((Number(saldoReal || 0) - Number(ajustando.saldo)) * 100) / 100
@@ -251,23 +256,44 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
                                 borderRadius: "var(--radius-lg)",
                             }}
                         >
-                            <div>
-                                <p className="text-sm font-medium">
-                                    {cuenta.nombre}
-                                </p>
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium break-words">
+                                        {cuenta.nombre}
+                                    </p>
 
-                                <p
-                                    className="text-xs"
-                                    style={{
-                                        color: "var(--color-muted-foreground)",
-                                    }}
-                                >
-                                    {ETIQUETAS[cuenta.tipo]} · {cuenta.moneda}
-                                </p>
+                                    <p
+                                        className="text-xs"
+                                        style={{
+                                            color: "var(--color-muted-foreground)",
+                                        }}
+                                    >
+                                        {ETIQUETAS[cuenta.tipo]} · {cuenta.moneda}
+                                    </p>
+                                </div>
+
+                                {/* Lo delicado queda escondido en el menú */}
+                                <MenuAcciones
+                                    etiqueta={cuenta.nombre}
+                                    acciones={[
+                                        {
+                                            label: "Editar",
+                                            onClick: function () {
+                                                abrirEdicion(cuenta)
+                                            },
+                                        },
+                                        {
+                                            label: "Desactivar",
+                                            onClick: function () {
+                                                eliminar(cuenta)
+                                            },
+                                        },
+                                    ]}
+                                />
                             </div>
 
                             <p
-                                className="text-2xl font-light"
+                                className="text-2xl font-light break-words"
                                 style={{
                                     fontFamily: "var(--font-mono)",
                                     color:
@@ -282,17 +308,16 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
                                 </span>
                             </p>
 
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 <Button
                                     type="button"
-                                    variant="secondary"
-                                    aria-label={`Editar ${cuenta.nombre}`}
+                                    aria-label={`Ver movimientos de ${cuenta.nombre}`}
                                     className="!py-1 !text-xs"
                                     onClick={function () {
-                                        abrirEdicion(cuenta)
+                                        setViendo(cuenta)
                                     }}
                                 >
-                                    Editar
+                                    Ver movimientos
                                 </Button>
 
                                 <Button
@@ -305,18 +330,6 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
                                     }}
                                 >
                                     Ajustar saldo
-                                </Button>
-
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    aria-label={`Eliminar ${cuenta.nombre}`}
-                                    className="!py-1 !text-xs"
-                                    onClick={function () {
-                                        eliminar(cuenta)
-                                    }}
-                                >
-                                    Desactivar
                                 </Button>
                             </div>
                         </div>
@@ -506,6 +519,13 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
                     </form>
                 )}
             </Modal>
+
+            <MovimientosCuentaModal
+                cuenta={viendo}
+                onClose={function () {
+                    setViendo(null)
+                }}
+            />
         </div>
     )
 }

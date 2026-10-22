@@ -1,0 +1,105 @@
+import { useEffect, useRef, useState } from "react"
+
+type Accion = {
+    label: string
+    onClick: () => void
+}
+
+type MenuAccionesProps = {
+    // describe a qué pertenece el menú, ej. "Cuenta Itaú"
+    etiqueta: string
+    acciones: Accion[]
+}
+
+export default function MenuAcciones({
+    etiqueta,
+    acciones,
+}: MenuAccionesProps) {
+    const [abierto, setAbierto] = useState(false)
+    const contenedorRef = useRef<HTMLDivElement>(null)
+
+    // click afuera o Escape cierran el menú
+    useEffect(
+        function () {
+            if (!abierto) {
+                return
+            }
+
+            function alHacerClick(e: MouseEvent) {
+                if (
+                    contenedorRef.current &&
+                    !contenedorRef.current.contains(e.target as Node)
+                ) {
+                    setAbierto(false)
+                }
+            }
+
+            function alPresionar(e: KeyboardEvent) {
+                if (e.key === "Escape") {
+                    setAbierto(false)
+                }
+            }
+
+            document.addEventListener("mousedown", alHacerClick)
+            document.addEventListener("keydown", alPresionar)
+
+            return function () {
+                document.removeEventListener("mousedown", alHacerClick)
+                document.removeEventListener("keydown", alPresionar)
+            }
+        },
+        [abierto]
+    )
+
+    return (
+        <div ref={contenedorRef} className="relative">
+            <button
+                type="button"
+                aria-label={`Más opciones de ${etiqueta}`}
+                aria-haspopup="menu"
+                aria-expanded={abierto}
+                onClick={function () {
+                    setAbierto(!abierto)
+                }}
+                className="w-11 h-11 md:w-7 md:h-7 text-sm"
+                style={{
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-muted-foreground)",
+                }}
+            >
+                ⋯
+            </button>
+
+            {abierto && (
+                <div
+                    role="menu"
+                    className="absolute right-0 top-full mt-1 z-30 flex flex-col min-w-36 overflow-hidden"
+                    style={{
+                        background: "var(--color-card)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: "var(--radius-md)",
+                        boxShadow: "0 4px 12px rgba(28,28,26,0.15)",
+                    }}
+                >
+                    {acciones.map(function (accion) {
+                        return (
+                            <button
+                                key={accion.label}
+                                type="button"
+                                role="menuitem"
+                                onClick={function () {
+                                    setAbierto(false)
+                                    accion.onClick()
+                                }}
+                                className="text-left text-sm px-3 py-2 min-h-11 md:min-h-0"
+                            >
+                                {accion.label}
+                            </button>
+                        )
+                    })}
+                </div>
+            )}
+        </div>
+    )
+}
