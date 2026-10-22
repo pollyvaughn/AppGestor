@@ -1,6 +1,18 @@
+# =========================================================
+# Rutas de compras con tarjeta
+#
+#   POST   /compras-tarjeta/                  -> registrar compra (crea las cuotas)
+#   GET    /compras-tarjeta/                  -> listar compras
+#   GET    /compras-tarjeta/{compra_id}/cuotas -> cuotas de una compra
+#   PUT    /compras-tarjeta/{compra_id}       -> editar (solo la descripción)
+#   DELETE /compras-tarjeta/{compra_id}       -> anular compra
+#
+# Punto 5: acá ya NO hay rutas de ajustes. Eran copias de las de
+# routes/ajustes.py y el front nunca las usó. Los ajustes viven en /ajustes.
+# =========================================================
+
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.models.ajuste import AjusteCrear
 from backend.auth.dependencies import (
     obtener_usuario_actual,
     requerir_cuenta_inicial
@@ -12,12 +24,6 @@ from backend.services.compra_tarjeta_service import (
     listar_cuotas,
     editar_compra,
     eliminar_compra
-)
-
-from backend.services.ajuste_service import (
-    crear_ajuste,
-    listar_ajustes,
-    anular_ajuste
 )
 
 
@@ -54,54 +60,6 @@ def crear(
 def listar(usuario=Depends(obtener_usuario_actual)):
     return listar_compras(usuario["id"])
 
-
-@router.post("/cuota/{cuota_id}/ajustes")
-def agregar_ajuste(
-    cuota_id: int,
-    ajuste: AjusteCrear,
-    usuario=Depends(obtener_usuario_actual)
-):
-    try:
-        ajuste.cuota_id = cuota_id
-
-        return crear_ajuste(
-            ajuste,
-            usuario["id"]
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error)
-        )
-
-
-@router.get("/cuota/{cuota_id}/ajustes")
-def ajustes(
-    cuota_id: int,
-    usuario=Depends(obtener_usuario_actual)
-):
-    return listar_ajustes(
-        cuota_id,
-        usuario["id"]
-    )
-
-@router.delete("/ajuste/{ajuste_id}")
-def anular_ajuste_route(
-    ajuste_id: int,
-    usuario=Depends(obtener_usuario_actual)
-):
-    try:
-        return anular_ajuste(
-            ajuste_id,
-            usuario["id"]
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error)
-        )
 
 @router.get("/{compra_id}/cuotas")
 def cuotas(

@@ -1,7 +1,19 @@
+# =========================================================
+# Servicio de ajustes de cuota (recargos, intereses, comisiones,
+# descuentos y adicionales). Crear, listar y anular.
+#
+# Punto 5: crear_ajuste recibe cuota_id como parámetro (viene de la URL).
+# Antes lo leía de ajuste.cuota_id, un campo que el body tenía que repetir.
+#
+# Total de una cuota = monto_base + ajustes activos
+#   (recargo / interés / comisión / adicional suman, descuento resta).
+# monto_pendiente = total de la cuota - pagos confirmados.
+# =========================================================
+
 from backend.database import get_connection
 
 
-def crear_ajuste(ajuste, usuario_id):
+def crear_ajuste(cuota_id, ajuste, usuario_id):
     conexion = get_connection()
     cursor = None
 
@@ -9,6 +21,8 @@ def crear_ajuste(ajuste, usuario_id):
         cursor = conexion.cursor(dictionary=True)
         conexion.start_transaction()
 
+        # FOR UPDATE: bloquea la cuota hasta el commit para que dos
+        # ajustes simultáneos no se pisen al recalcular el pendiente.
         cursor.execute(
             """
             SELECT
@@ -29,7 +43,7 @@ def crear_ajuste(ajuste, usuario_id):
               AND m.usuario_id = %s
             FOR UPDATE
             """,
-            (ajuste.cuota_id, usuario_id)
+            (cuota_id, usuario_id)
         )
 
         cuota = cursor.fetchone()
@@ -68,7 +82,7 @@ def crear_ajuste(ajuste, usuario_id):
             VALUES (%s, %s, %s, %s, %s)
             """,
             (
-                ajuste.cuota_id,
+                cuota_id,
                 ajuste.tipo,
                 ajuste.monto,
                 cuota["moneda"],
@@ -102,7 +116,7 @@ def crear_ajuste(ajuste, usuario_id):
             WHERE cuota_id = %s
               AND estado = 'ACTIVO'
             """,
-            (ajuste.cuota_id,)
+            (cuota_id,)
         )
 
         resultado = cursor.fetchone()
@@ -126,7 +140,7 @@ def crear_ajuste(ajuste, usuario_id):
             WHERE cuota_id = %s
               AND estado = 'CONFIRMADO'
             """,
-            (ajuste.cuota_id,)
+            (cuota_id,)
         )
 
         pagos = cursor.fetchone()
@@ -158,7 +172,7 @@ def crear_ajuste(ajuste, usuario_id):
             (
                 monto_pendiente,
                 estado,
-                ajuste.cuota_id
+                cuota_id
             )
         )
 
@@ -166,7 +180,7 @@ def crear_ajuste(ajuste, usuario_id):
 
         return {
             "id": ajuste_id,
-            "cuota_id": ajuste.cuota_id,
+            "cuota_id": cuota_id,
             "tipo": ajuste.tipo,
             "monto": ajuste.monto,
             "descripcion": ajuste.descripcion,

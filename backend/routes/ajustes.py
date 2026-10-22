@@ -1,3 +1,13 @@
+# =========================================================
+# Rutas de ajustes de cuota (recargos, intereses, descuentos...)
+# Es el ÚNICO lugar donde viven las rutas de ajustes: las copias que
+# había en compras_tarjeta.py se borraron (punto 5).
+#
+#   POST   /ajustes/cuota/{cuota_id}  -> agrega un ajuste a la cuota
+#   GET    /ajustes/cuota/{cuota_id}  -> lista los ajustes de la cuota
+#   DELETE /ajustes/{ajuste_id}       -> anula un ajuste
+# =========================================================
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.auth.dependencies import (
@@ -26,9 +36,9 @@ def agregar_ajuste(
     usuario=Depends(obtener_usuario_actual)
 ):
     try:
-        ajuste.cuota_id = cuota_id
-
+        # la cuota sale de la URL, no del body
         return crear_ajuste(
+            cuota_id,
             ajuste,
             usuario["id"]
         )
