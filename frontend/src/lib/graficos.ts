@@ -4,6 +4,7 @@ import {
     moverMes,
     nombreMes,
 } from "./movimientos"
+import type {Periodo} from "./periodo"
 
 export const COLOR_SIN_CATEGORIA = "#7A7873"
 const COLOR_OTRAS = "#B8B5AE"
@@ -358,4 +359,68 @@ export function composicionPorMetodo(
                     : PALETA_METODOS[indice % PALETA_METODOS.length],
         }
     })
+}
+
+// ---------- Evolución diaria ----------
+
+// Un punto por día del periodo (también los días sin movimientos).
+// Usa el mismo tipo que la serie mensual: "mes" guarda la fecha completa
+// ("2026-10-12") y "etiqueta" muestra "12/10".
+export function serieDiaria(
+    contables: Movimiento[],
+    moneda: string,
+    periodo: Periodo
+): PuntoMensual[] {
+    const porDia: Record<string, { ingresos: number; gastos: number }> = {}
+
+    for (const m of contables) {
+        if (m.moneda !== moneda) {
+            continue
+        }
+
+        const clave = m.fecha.slice(0, 10)
+
+        if (clave < periodo.desde || clave > periodo.hasta) {
+            continue
+        }
+
+        if (!porDia[clave]) {
+            porDia[clave] = { ingresos: 0, gastos: 0 }
+        }
+
+        if (m.tipo === "INGRESO") {
+            porDia[clave].ingresos += Number(m.monto)
+        } else {
+            porDia[clave].gastos += Number(m.monto)
+        }
+    }
+
+    const [a1, m1, d1] = periodo.desde.split("-").map(Number)
+    const [a2, m2, d2] = periodo.hasta.split("-").map(Number)
+    const fin = Date.UTC(a2, m2 - 1, d2)
+    const puntos: PuntoMensual[] = []
+
+    for (
+        let t = Date.UTC(a1, m1 - 1, d1);
+        t <= fin;
+        t += 24 * 60 * 60 * 1000
+    ) {
+        const clave = new Date(t).toISOString().slice(0, 10)
+        const ingresos = porDia[clave]?.ingresos ?? 0
+        const gastos = porDia[clave]?.gastos ?? 0
+
+        puntos.push({
+            mes: clave,
+            etiqueta: `${clave.slice(8, 10)}/${clave.slice(5, 7)}`,
+            ingresos: ingresos,
+            gastos: gastos,
+            margen: ingresos - gastos,
+            superavit:
+                ingresos >= gastos ? [gastos, ingresos] : [ingresos, ingresos],
+            deficit:
+                gastos > ingresos ? [ingresos, gastos] : [ingresos, ingresos],
+        })
+    }
+
+    return puntos
 }

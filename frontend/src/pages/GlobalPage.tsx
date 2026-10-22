@@ -31,7 +31,7 @@ import {
     tasaAhorro,
     variacionPorcentual,
 } from "../lib/resumen"
-import { composicionPorCategoria, composicionPorMetodo, serieMensual } from "../lib/graficos"
+import { composicionPorCategoria, composicionPorMetodo, serieDiaria, serieMensual } from "../lib/graficos"
 import MetodoPagoChart from "../components/global/MetodoPagoChart"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
@@ -204,6 +204,7 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
 
     // Datos de los gráficos
     const serie = serieMensual(contables, moneda)
+    const serieDia = serieDiaria(contables, moneda, periodo)
 
     const colores: Record<number, string> = {}
 
@@ -419,7 +420,12 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
 
                     {/* Fila 2: evolución histórica + composición del gasto */}
                     <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-                        <EvolucionChart datos={serie} moneda={moneda} />
+                        <EvolucionChart 
+                            datos={serie} 
+                            datosDiarios={serieDia}
+                            moneda={moneda} 
+                            periodo={periodo}
+                            />
 
                         <ComposicionGastoChart
                             gastos={porcionesGasto}
