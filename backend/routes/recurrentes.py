@@ -1,3 +1,13 @@
+# =========================================================
+# Rutas de recurrentes
+#
+# Punto 6:
+#   - anular_periodo recibe el período como date (antes str): una fecha
+#     inválida ("abc", 2026-02-31) da 422 en vez de llegar cruda al SQL
+#   - el monto de generar tiene tope máximo (MONTO_MAXIMO)
+# =========================================================
+
+from datetime import date
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -9,6 +19,7 @@ from backend.models.recurrente import (
     RecurrenteCrear,
     RecurrenteEditar
 )
+from backend.models.tipos import MONTO_MAXIMO
 from backend.services.recurrente_service import (
     crear_recurrente,
     listar_recurrentes,
@@ -102,7 +113,7 @@ def eliminar(
 @router.post("/{recurrente_id}/generar")
 def generar(
     recurrente_id: int,
-    monto: float | None = Query(default=None, gt=0),
+    monto: float | None = Query(default=None, gt=0, le=MONTO_MAXIMO),
     metodo_pago_id: int | None = Query(default=None, gt=0),
     usuario=Depends(obtener_usuario_actual)
 ):
@@ -127,7 +138,7 @@ def generar(
 @router.delete("/{recurrente_id}/periodo/{periodo}")
 def anular_periodo(
     recurrente_id: int,
-    periodo: str,
+    periodo: date,
     usuario=Depends(obtener_usuario_actual)
 ):
     resultado, error = anular_movimiento_recurrente(

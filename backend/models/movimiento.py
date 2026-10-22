@@ -1,13 +1,16 @@
 # =========================================================
 # Modelos de movimientos (lo que valida FastAPI antes de llegar al servicio)
-# gt=0  -> "greater than 0": estrictamente mayor a cero
+# Monto -> mayor a 0 y con tope máximo (ver tipos.py)
 # date  -> fecha real "AAAA-MM-DD"; si no existe (ej. 2026-02-31) devuelve 422
+# La fecha FUTURA no se valida acá sino en el servicio (depende de "hoy").
 # =========================================================
 
 from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from backend.models.tipos import Descripcion, Monto
 
 
 class MovimientoCrear(BaseModel):
@@ -20,11 +23,11 @@ class MovimientoCrear(BaseModel):
         "PAGO_TARJETA",
         "AJUSTE"
     ]
-    descripcion: str | None = None
-    monto: float = Field(gt=0)
+    descripcion: Descripcion | None = None
+    monto: Monto
     moneda: Literal["PYG", "USD", "EUR", "ARS", "BRL"]
     # el esquema de la base ya exige tipo_cambio > 0 (CHECK): se valida acá también
-    tipo_cambio: float | None = Field(default=None, gt=0)
+    tipo_cambio: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     fecha: date | None = None
 
 
@@ -38,16 +41,16 @@ class MovimientoEditar(BaseModel):
         "PAGO_TARJETA",
         "AJUSTE"
     ]
-    descripcion: str | None = None
-    monto: float = Field(gt=0)
+    descripcion: Descripcion | None = None
+    monto: Monto
     moneda: Literal["PYG", "USD", "EUR", "ARS", "BRL"]
-    tipo_cambio: float | None = Field(default=None, gt=0)
+    tipo_cambio: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     fecha: date | None = None
 
 
 class TransferenciaCrear(BaseModel):
     origen_id: int
     destino_id: int
-    monto: float = Field(gt=0)
+    monto: Monto
     fecha: date | None = None
-    descripcion: str | None = None
+    descripcion: Descripcion | None = None

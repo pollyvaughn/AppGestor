@@ -1,20 +1,24 @@
 # =========================================================
 # Modelos de pagos de cuotas
-# gt=0 -> estrictamente mayor a cero (no se aceptan pagos de 0 ni negativos)
+# Monto -> estrictamente mayor a cero y con tope máximo (ver tipos.py)
+# metodos -> al menos una cuenta (antes se aceptaba una lista vacía
+#            y recién fallaba más adentro con otro mensaje)
 # =========================================================
 
 from datetime import date
 from pydantic import BaseModel, Field
 
+from backend.models.tipos import Monto
+
 
 # Una parte del pago: cuánto pone cada cuenta
 class PagoMetodo(BaseModel):
     metodo_pago_id: int
-    monto: float = Field(gt=0)
+    monto: Monto
 
 
 class PagoCrear(BaseModel):
     cuota_id: int
-    monto: float = Field(gt=0)
-    metodos: list[PagoMetodo]
+    monto: Monto
+    metodos: list[PagoMetodo] = Field(min_length=1)
     fecha: date | None = None

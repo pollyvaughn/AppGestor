@@ -1,24 +1,25 @@
 # =========================================================
 # Modelos de tarjetas de crédito
-# moneda: Literal -> solo las monedas que existen en la base (ENUM);
-#   antes era str y una moneda inventada rompía al guardar.
+# nombre         -> sin espacios en los bordes, 1 a 100 caracteres
+# limite_credito -> mayor a 0 y con tope (ver tipos.py)
 # ge/le: "greater or equal" / "less or equal" (mayor o igual / menor o igual)
 #
-# Punto 4: la moneda de una tarjeta NO se puede cambiar al editar.
-#   En TarjetaCreditoEditar la moneda es opcional (None = no se manda):
-#   si viene y es distinta a la actual, el servicio responde 400.
-#   Si no viene, o viene igual, no pasa nada.
+# Punto 4: la moneda NO se puede cambiar al editar. En TarjetaCreditoEditar
+#   es opcional (None = no se manda): si viene y es distinta a la actual,
+#   el servicio responde 400. Si no viene, o viene igual, no pasa nada.
 # =========================================================
 
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from backend.models.tipos import Monto, Nombre
+
 
 class TarjetaCreditoCrear(BaseModel):
-    nombre: str
+    nombre: Nombre
     moneda: Literal["PYG", "USD", "EUR", "ARS", "BRL"]
-    limite_credito: float = Field(gt=0)
+    limite_credito: Monto
     fecha_cierre: int = Field(ge=1, le=31)
     fecha_vencimiento: int = Field(ge=1, le=31)
     porcentaje_pago_minimo: float | None = Field(
@@ -29,10 +30,10 @@ class TarjetaCreditoCrear(BaseModel):
 
 
 class TarjetaCreditoEditar(BaseModel):
-    nombre: str
+    nombre: Nombre
     # opcional: solo se usa para detectar un intento de cambiarla
     moneda: Literal["PYG", "USD", "EUR", "ARS", "BRL"] | None = None
-    limite_credito: float = Field(gt=0)
+    limite_credito: Monto
     fecha_cierre: int = Field(ge=1, le=31)
     fecha_vencimiento: int = Field(ge=1, le=31)
     porcentaje_pago_minimo: float | None = Field(

@@ -1,7 +1,16 @@
+// =========================================================
+// Formulario de registro
+// Punto 6: valida en el front lo mismo que el backend (nombre no vacío,
+// contraseña de 8 o más) para mostrar un mensaje claro en vez del
+// genérico "Revisá los datos ingresados".
+// =========================================================
+
 import { useState } from "react"
 import { registrarUsuario } from "../../services/authService"
 import Button from "../ui/Button"
 import Input from "../ui/Input"
+
+const LARGO_MINIMO_PASSWORD = 8
 
 type RegisterFormProps = {
     onRegister: () => void
@@ -17,9 +26,21 @@ export default function RegisterForm({ onRegister }: RegisterFormProps) {
         event.preventDefault()
         setError("")
 
+        if (nombre.trim() === "") {
+            setError("Escribí tu nombre")
+            return
+        }
+
+        if (password.length < LARGO_MINIMO_PASSWORD) {
+            setError(
+                `La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres`
+            )
+            return
+        }
+
         try {
             await registrarUsuario({
-                nombre: nombre,
+                nombre: nombre.trim(),
                 email: email,
                 password: password,
             })
@@ -49,6 +70,7 @@ export default function RegisterForm({ onRegister }: RegisterFormProps) {
                 onChange={function (event) {
                     setNombre(event.target.value)
                 }}
+                maxLength={100}
                 required
             />
 
@@ -71,6 +93,7 @@ export default function RegisterForm({ onRegister }: RegisterFormProps) {
                 onChange={function (event) {
                     setPassword(event.target.value)
                 }}
+                maxLength={128}
                 required
             />
 

@@ -1,6 +1,13 @@
 # =========================================================
 # Servicio de movimientos (ingresos, egresos y transferencias)
 # Crear, listar, editar, anular y transferir entre cuentas.
+#
+# Punto 6:
+#   - crear y editar rechazan una fecha futura (igual que compras,
+#     pagos y transferencias)
+#   - eliminar_movimiento bloquea la fila con FOR UPDATE: si llegan dos
+#     "anular" a la vez, el segundo ya la ve anulada y NO devuelve la
+#     plata una segunda vez
 # =========================================================
 
 from fastapi import HTTPException
@@ -36,6 +43,10 @@ def crear_movimiento(movimiento, usuario_id):
             return None, "La categoría es obligatoria para ingresos y egresos"
         if movimiento.metodo_pago_id is None:
             return None, "La cuenta o método de pago es obligatorio para ingresos y egresos"
+
+    # Punto 6: no se cargan movimientos con fecha futura
+    if movimiento.fecha is not None and movimiento.fecha > date.today():
+        return None, "La fecha del movimiento no puede ser futura"
 
     conexion = get_connection()
 
@@ -203,7 +214,7 @@ def listar_movimientos(usuario_id, categoria_id=None):
 
 
 # ---------------------------------------------------------
-# EDITAR MOVIMIENTO  (punto 2 del roadmap)
+# EDITAR MOVIMIENTO
 # ---------------------------------------------------------
 def editar_movimiento(movimiento_id, movimiento, usuario_id):
     # Validaciones sobre lo que llega (el movimiento NUEVO).
@@ -216,6 +227,10 @@ def editar_movimiento(movimiento_id, movimiento, usuario_id):
             return False, "La categoría es obligatoria para ingresos y egresos"
         if movimiento.metodo_pago_id is None:
             return False, "La cuenta o método de pago es obligatorio para ingresos y egresos"
+
+    # Punto 6: tampoco se puede mover un movimiento al futuro
+    if movimiento.fecha is not None and movimiento.fecha > date.today():
+        return False, "La fecha del movimiento no puede ser futura"
 
     conexion = get_connection()
 
@@ -375,8 +390,11 @@ def eliminar_movimiento(movimiento_id, usuario_id):
 
     try:
         cursor = conexion.cursor(dictionary=True)
+        conexion.start_transaction()
 
-        # Obtener movimiento actual
+        # FOR UPDATE: bloquea la fila hasta el commit. Si llegan dos
+        # "anular" a la vez, el segundo espera, ve el movimiento ya
+        # ANULADO y devuelve 0 (404) sin tocar los saldos otra vez.
         cursor.execute(
             """
             SELECT metodo_pago_id, metodo_pago_destino_id, tipo, monto
@@ -384,6 +402,7 @@ def eliminar_movimiento(movimiento_id, usuario_id):
             WHERE id = %s
             AND usuario_id = %s
             AND estado != 'ANULADO'
+            FOR UPDATE
             """,
             (movimiento_id, usuario_id)
         )
@@ -391,6 +410,7 @@ def eliminar_movimiento(movimiento_id, usuario_id):
         movimiento = cursor.fetchone()
 
         if not movimiento:
+            conexion.rollback()
             return 0
 
         if movimiento["tipo"] in ("AJUSTE", "SALDO_INICIAL"):

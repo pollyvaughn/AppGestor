@@ -1,5 +1,15 @@
+// =========================================================
+// Input de montos con separador de miles (300.000 / 1.250,50)
+// Toda la lógica de limpiar lo escrito o pegado vive en lib/moneda.ts
+// (normalizarMonto e interpretarPegado) para poder probarla aparte.
+// =========================================================
+
 import Input from "./Input"
-import { agregarSeparadores, decimalesDe } from "../../lib/moneda"
+import {
+    agregarSeparadores,
+    interpretarPegado,
+    normalizarMonto,
+} from "../../lib/moneda"
 
 type MontoInputProps = {
     id?: string
@@ -19,28 +29,13 @@ export default function MontoInput({
     ...props
 }: MontoInputProps) {
     function manejarCambio(e: React.ChangeEvent<HTMLInputElement>) {
-        const decimales = decimalesDe(moneda)
+        onChange(normalizarMonto(e.target.value, moneda))
+    }
 
-        // solo dígitos y coma; los puntos los pone la app
-        let limpio = e.target.value.replace(/[^\d,]/g, "")
-
-        if (decimales === 0) {
-            limpio = limpio.replace(/,/g, "")
-        }
-
-        const [entero, ...resto] = limpio.split(",")
-
-        let resultado = entero.replace(/^0+(?=\d)/, "")
-
-        if (decimales > 0 && resto.length > 0) {
-            if (resultado === "") {
-                resultado = "0"
-            }
-
-            resultado += "." + resto.join("").slice(0, decimales)
-        }
-
-        onChange(resultado)
+    // al pegar se interpreta el formato del texto y se reemplaza el valor
+    function manejarPegado(e: React.ClipboardEvent<HTMLInputElement>) {
+        e.preventDefault()
+        onChange(interpretarPegado(e.clipboardData.getData("text"), moneda))
     }
 
     return (
@@ -50,6 +45,7 @@ export default function MontoInput({
             inputMode="decimal"
             value={agregarSeparadores(value)}
             onChange={manejarCambio}
+            onPaste={manejarPegado}
         />
     )
 }

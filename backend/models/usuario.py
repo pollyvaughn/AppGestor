@@ -1,12 +1,20 @@
+# =========================================================
+# Modelos de usuario
+# nombre   -> sin espacios en los bordes, 1 a 100 caracteres
+# password -> mínimo 8 caracteres (antes se aceptaba una contraseña vacía)
+# =========================================================
+
 from pydantic import BaseModel, EmailStr
+
+from backend.models.tipos import Nombre, Password
 
 
 class UsuarioCrear(BaseModel):
-    nombre: str
+    nombre: Nombre
     email: EmailStr
-    password: str
+    password: Password
 
 
 class UsuarioActualizar(BaseModel):
-    nombre: str
+    nombre: Nombre
     email: EmailStr
