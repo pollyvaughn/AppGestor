@@ -31,7 +31,8 @@ import {
     tasaAhorro,
     variacionPorcentual,
 } from "../lib/resumen"
-import { composicionPorCategoria, serieMensual } from "../lib/graficos"
+import { composicionPorCategoria, composicionPorMetodo, serieMensual } from "../lib/graficos"
+import MetodoPagoChart from "../components/global/MetodoPagoChart"
 import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
@@ -61,6 +62,7 @@ function textoOperaciones(cantidad: number) {
 }
 
 type Cuenta = {
+    id: number
     nombre: string
     tipo: string
     moneda: string
@@ -222,6 +224,18 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
         moneda,
         colores,
         "INGRESO"
+    )
+
+    const tiposPorCuenta: Record<number, string> = {}
+
+    for (const cuenta of cuentas) {
+        tiposPorCuenta[cuenta.id] = cuenta.tipo
+    }
+
+    const porcionesMetodo = composicionPorMetodo(
+        delPeriodo,
+        moneda,
+        tiposPorCuenta
     )
 
     // Tope mensual de la moneda elegida
@@ -424,6 +438,12 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
                             tope={topes[moneda] ?? null}
                             onGuardarTope={guardarTope}
                             onQuitarTope={quitarTope}
+                        />
+                        {/* Fila 3b: gastos por método de pago */}
+                        <MetodoPagoChart
+                            porciones={porcionesMetodo}
+                            total={egresos}
+                            moneda={moneda}
                         />
 
                         <section className="p-4 sm:p-6" style={estiloCard}>

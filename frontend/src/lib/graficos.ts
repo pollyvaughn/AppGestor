@@ -250,3 +250,112 @@ export function serieRitmo(
         proyeccion: (acumulado / diaHoy) * diasMes,
     }
 }
+
+// ---------- Gastos por método de pago ----------
+
+export type PorcionMetodo = {
+    clave: string
+    nombre: string
+    // tipo de cuenta (EFECTIVO, TARJETA_CREDITO...) si se conoce
+    tipo: string | null
+    total: number
+    porcentaje: number
+    cantidad: number
+    fill: string
+}
+
+const PALETA_METODOS = [
+    "#3B6EA8",
+    "#A86B3B",
+    "#2A6049",
+    "#7B5EA7",
+    "#9A3223",
+    "#4A8A7A",
+    "#B07840",
+]
+
+// lista: movimientos contables del periodo (se filtran los egresos acá)
+// tipos: id de cuenta => tipo de cuenta
+export function composicionPorMetodo(
+    lista: Movimiento[],
+    moneda: string,
+    tipos: Record<number, string>
+): PorcionMetodo[] {
+    const grupos: Record<
+        string,
+        {
+            clave: string
+            nombre: string
+            tipo: string | null
+            total: number
+            cantidad: number
+        }
+    > = {}
+    let suma = 0
+
+    for (const m of lista) {
+        if (m.tipo !== "EGRESO" || m.moneda !== moneda) {
+            continue
+        }
+
+        const monto = Number(m.monto)
+        suma += monto
+
+        const clave = String(m.metodo_pago_id ?? "sin-metodo")
+
+        const grupo = grupos[clave] ?? {
+            clave: clave,
+            nombre: m.metodo_pago ?? "Sin método de pago",
+            tipo:
+                m.metodo_pago_id !== null
+                    ? (tipos[m.metodo_pago_id] ?? null)
+                    : null,
+            total: 0,
+            cantidad: 0,
+        }
+
+        grupo.total += monto
+        grupo.cantidad += 1
+        grupos[clave] = grupo
+    }
+
+    if (suma <= 0) {
+        return []
+    }
+
+    const ordenados = Object.values(grupos).sort(function (a, b) {
+        return b.total - a.total
+    })
+
+    let visibles = ordenados
+
+    if (ordenados.length > MAX_PORCIONES + 1) {
+        const resto = ordenados.slice(MAX_PORCIONES)
+
+        visibles = [
+            ...ordenados.slice(0, MAX_PORCIONES),
+            {
+                clave: "otros",
+                nombre: "Otros",
+                tipo: null,
+                total: resto.reduce(function (t, g) {
+                    return t + g.total
+                }, 0),
+                cantidad: resto.reduce(function (t, g) {
+                    return t + g.cantidad
+                }, 0),
+            },
+        ]
+    }
+
+    return visibles.map(function (grupo, indice) {
+        return {
+            ...grupo,
+            porcentaje: (grupo.total / suma) * 100,
+            fill:
+                grupo.clave === "otros"
+                    ? COLOR_OTRAS
+                    : PALETA_METODOS[indice % PALETA_METODOS.length],
+        }
+    })
+}
