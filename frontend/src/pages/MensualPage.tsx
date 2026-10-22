@@ -20,6 +20,7 @@ import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
 import MovimientoModal from "../components/movimientos/MovimientoModal"
+import { balanceDelMes } from "../lib/balance"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -287,6 +288,7 @@ export default function MensualPage({
             : total + Number(c.saldo)
     }, 0)
     // Porcentaje de lo ingresado que no se gastó (solo tiene sentido si hubo ingresos)
+    const balanceMes = balanceDelMes(movimientos, cuentas, moneda, mes)
     const tasaAhorro =
         ingresos > 0 ? Math.round((balance / ingresos) * 100) : null
     const anchoBarra =
@@ -572,6 +574,14 @@ export default function MensualPage({
                                 </p>
                                 <p className="mt-2 text-xs" style={{ color: "var(--color-accent)" }}>
                                     Saldo actual en cuentas: {formatearMonto(saldoActual, moneda)} {moneda}
+                                </p>
+                                <p className="mt-2 text-xs" style={{ color: "var(--color-accent)" }}>
+                                    Arrastre del mes anterior: {balanceMes.arrastre < 0 ? "−" : ""}
+                                    {formatearMonto(Math.abs(balanceMes.arrastre), moneda)} {moneda}
+                                </p>
+                                <p className="mt-2 text-xs" style={{ color: "var(--color-accent)" }}>
+                                    Saldo al cierre de {nombreMes(mes)}: {balanceMes.cierre < 0 ? "−" : ""}
+                                    {formatearMonto(Math.abs(balanceMes.cierre), moneda)} {moneda}
                                 </p>
                             </div>
                         </div>
