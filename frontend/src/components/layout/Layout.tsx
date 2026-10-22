@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react"
+
 export type Vista =
     | "global"
     | "mensual"
@@ -20,6 +22,8 @@ type LayoutProps = {
     onCambiarVista: (vista: Vista) => void
     onCerrarSesion: () => void
     onNuevoMovimiento: () => void
+    onTransferir: () => void
+    onNuevaCompra: () => void
     children: React.ReactNode
 }
 
@@ -28,8 +32,40 @@ export default function Layout({
     onCambiarVista,
     onCerrarSesion,
     onNuevoMovimiento,
+    onTransferir,
+    onNuevaCompra,
     children,
 }: LayoutProps) {
+    const [menuAbierto, setMenuAbierto] = useState(false)
+
+    // Escape cierra el menú de crear
+    useEffect(
+        function () {
+            if (!menuAbierto) {
+                return
+            }
+
+            function alPresionar(e: KeyboardEvent) {
+                if (e.key === "Escape") {
+                    setMenuAbierto(false)
+                }
+            }
+
+            document.addEventListener("keydown", alPresionar)
+
+            return function () {
+                document.removeEventListener("keydown", alPresionar)
+            }
+        },
+        [menuAbierto]
+    )
+
+    const ACCIONES = [
+        { label: "Nuevo movimiento", accion: onNuevoMovimiento },
+        { label: "Transferencia entre cuentas", accion: onTransferir },
+        { label: "Nueva compra con tarjeta", accion: onNuevaCompra },
+    ]
+
     return (
         <div className="min-h-full">
             <header
@@ -94,22 +130,82 @@ export default function Layout({
                 {children}
             </main>
 
-            <button
-                type="button"
-                onClick={onNuevoMovimiento}
-                aria-label="Nuevo movimiento"
-                className="fixed z-40 right-4 bottom-4 sm:right-6 sm:bottom-6 h-14 min-w-14 px-4 flex items-center justify-center gap-2 rounded-full text-sm font-medium"
-                style={{
-                    background: "var(--color-foreground)",
-                    color: "var(--color-background)",
-                    boxShadow: "0 4px 12px rgba(28,28,26,0.25)",
-                }}
-            >
-                <span className="text-2xl leading-none" aria-hidden="true">
-                    +
-                </span>
-                <span className="hidden sm:inline">Nuevo movimiento</span>
-            </button>
+            {/* Capa transparente: un click afuera cierra el menú */}
+            {menuAbierto && (
+                <div
+                    className="fixed inset-0 z-40"
+                    onClick={function () {
+                        setMenuAbierto(false)
+                    }}
+                    aria-hidden="true"
+                />
+            )}
+
+            <div className="fixed z-40 right-4 bottom-4 sm:right-6 sm:bottom-6 flex flex-col items-end gap-2">
+                {menuAbierto && (
+                    <div
+                        role="menu"
+                        aria-label="Crear"
+                        className="flex flex-col overflow-hidden"
+                        style={{
+                            background: "var(--color-card)",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "var(--radius-lg)",
+                            boxShadow: "0 4px 12px rgba(28,28,26,0.25)",
+                        }}
+                    >
+                        {ACCIONES.map(function (item) {
+                            return (
+                                <button
+                                    key={item.label}
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={function () {
+                                        setMenuAbierto(false)
+                                        item.accion()
+                                    }}
+                                    className="text-left text-sm px-4 py-3 min-h-11"
+                                    style={{
+                                        borderBottom:
+                                            "1px solid var(--color-border)",
+                                    }}
+                                >
+                                    {item.label}
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+
+                <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={menuAbierto}
+                    aria-label="Crear"
+                    onClick={function () {
+                        setMenuAbierto(!menuAbierto)
+                    }}
+                    className="h-14 min-w-14 px-4 flex items-center justify-center gap-2 rounded-full text-sm font-medium"
+                    style={{
+                        background: "var(--color-foreground)",
+                        color: "var(--color-background)",
+                        boxShadow: "0 4px 12px rgba(28,28,26,0.25)",
+                    }}
+                >
+                    <span
+                        className="text-2xl leading-none"
+                        aria-hidden="true"
+                        style={{
+                            display: "inline-block",
+                            transition: "transform 0.15s",
+                            transform: menuAbierto ? "rotate(45deg)" : "none",
+                        }}
+                    >
+                        +
+                    </span>
+                    <span className="hidden sm:inline">Crear</span>
+                </button>
+            </div>
         </div>
     )
 }

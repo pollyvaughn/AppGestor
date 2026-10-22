@@ -19,7 +19,6 @@ import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
-import TransferenciaModal from "../components/movimientos/TransferenciaModal"
 import MovimientoModal from "../components/movimientos/MovimientoModal"
 
 type Tipo = "INGRESO" | "EGRESO"
@@ -112,7 +111,6 @@ export default function MensualPage({
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
-    const [modalTransferencia, setModalTransferencia] = useState(false)
     const [editando, setEditando] = useState<Movimiento | null>(null)
 
     // mes tiene la forma "2026-10": lo separamos en año y número de mes (1 a 12)
@@ -164,12 +162,6 @@ export default function MensualPage({
     }, [version])
 
     // ---------- Abrir el formulario ----------
-
-    function abrirTransferencia() {
-        setError("")
-        setMensaje("")
-        setModalTransferencia(true)
-    }
 
     function abrirEdicion(m: Movimiento) {
         setError("")
@@ -360,16 +352,6 @@ export default function MensualPage({
         <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-lg font-medium">Mensual</h1>
-
-                <div className="flex flex-wrap gap-2">
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={abrirTransferencia}
-                    >
-                        Transferir
-                    </Button>
-                </div>
             </div>
 
             {/* Selector de año y mes */}
@@ -1080,17 +1062,6 @@ export default function MensualPage({
                     cargar()
                 }}
                 onIrATarjetas={onIrATarjetas}
-            />
-            <TransferenciaModal
-                open={modalTransferencia}
-                cuentas={cuentas}
-                onClose={function () {
-                    setModalTransferencia(false)
-                }}
-                onGuardado={function () {
-                    setMensaje("Transferencia registrada")
-                    cargar()
-                }}
             />
         </div>
     )

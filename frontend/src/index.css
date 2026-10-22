@@ -65,3 +65,26 @@ body {
   background: var(--color-border);
   border-radius: 4px;
 }
+
+/* Lo clicable se nota al pasar el mouse */
+button:not(:disabled),
+select,
+summary,
+label[for],
+[role="tab"],
+input[type="checkbox"],
+input[type="date"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+button {
+  transition: opacity 0.15s;
+}
+
+button:not(:disabled):hover {
+  opacity: 0.8;
+}

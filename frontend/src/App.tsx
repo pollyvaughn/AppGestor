@@ -16,6 +16,7 @@ import Cargando from "./components/ui/Cargando"
 import Mensaje from "./components/ui/Mensaje"
 import Button from "./components/ui/Button"
 import MovimientoModal from "./components/movimientos/MovimientoModal"
+import TransferenciaModal from "./components/movimientos/TransferenciaModal"
 
 type EstadoConfiguracion = "cargando" | "requerida" | "completa" | "error"
 type CuentaConfiguracion = { tipo: string }
@@ -40,6 +41,8 @@ export default function App() {
         useState<EstadoConfiguracion>("cargando")
     const [errorConfiguracion, setErrorConfiguracion] = useState("")
     const [intentoConfiguracion, setIntentoConfiguracion] = useState(0)
+    const [modalTransferencia, setModalTransferencia] = useState(false)
+    const [cuentasTransferencia, setCuentasTransferencia] = useState<any[]>([])
 
     useEffect(
         function () {
@@ -100,6 +103,19 @@ export default function App() {
         localStorage.removeItem("token")
         localStorage.removeItem("usuario")
         setUsuario(null)
+    }
+
+    async function abrirTransferencia() {
+        try {
+            setCuentasTransferencia(await listarCuentas())
+            setModalTransferencia(true)
+        } catch (e) {
+            setAviso(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudieron cargar las cuentas"
+            )
+        }
     }
 
     if (!usuario) {
@@ -180,6 +196,10 @@ export default function App() {
                 onNuevoMovimiento={function () {
                     setModalMovimiento(true)
                 }}
+                onTransferir={abrirTransferencia}
+                onNuevaCompra={function () {
+                    setVista("tarjetas")
+                }}
             >
                 {aviso && (
                     <div className="mb-4">
@@ -217,6 +237,20 @@ export default function App() {
                 }}
                 onIrATarjetas={function () {
                     setVista("tarjetas")
+                }}
+
+            />
+            <TransferenciaModal
+                open={modalTransferencia}
+                cuentas={cuentasTransferencia}
+                onClose={function () {
+                    setModalTransferencia(false)
+                }}
+                onGuardado={function () {
+                    setAviso("Transferencia registrada")
+                    setVersionDatos(function (v) {
+                        return v + 1
+                    })
                 }}
             />
         </>
