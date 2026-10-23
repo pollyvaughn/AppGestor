@@ -193,6 +193,7 @@ export default function EvolucionChart({
                                     interval = {esDia ? "preserveStartEnd" : "preserveEnd"}
                                     minTickGap={esDia ? 24 : 5}
                                 />
+                               
                                 <YAxis
                                     tick={estiloTick}
                                     tickLine={false}
