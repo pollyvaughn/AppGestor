@@ -43,6 +43,16 @@ import ComposicionGastoChart from "../components/global/ComposicionGastoChart"
 import RitmoGastoChart from "../components/global/RitmoGastoChart"
 import TablaMensual from "../components/global/TablaMensual"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
+import { listarRecurrentes } from "../services/recurrenteService"
+import { listarResumenes } from "../services/resumenService"
+import { fechaHoy } from "../lib/fechas"
+import {
+    type RecurrenteProximo,
+    type ResumenPendiente,
+    compromisosProximos,
+    totalApartado,
+} from "../lib/apartado"
+import DisponibleRealCard from "../components/global/DisponibleRealCard"
 
 const estiloCard = {
     background: "var(--color-card)",
@@ -70,6 +80,9 @@ type Cuenta = {
 }
 
 type Tarjeta = {
+    id: number
+    nombre: string
+    estado: string
     moneda: string
     deuda_actual: number
 }
@@ -79,7 +92,41 @@ type Categoria = {
     color: string | null
 }
 
+
+// Resúmenes pendientes de todas las tarjetas activas. Si una falla,
+// el resto de la página sigue funcionando.
+async function cargarResumenes(
+        tarjetas: Tarjeta[]
+    ): Promise<ResumenPendiente[]> {
+        const activas = tarjetas.filter(function (t) {
+            return t.estado === "ACTIVA"
+        })
+
+        const listas = await Promise.all(
+            activas.map(async function (t) {
+                try {
+                    const datos = await listarResumenes(t.id)
+
+                    return datos.resumenes.map(function (r: any) {
+                        return {
+                            tarjeta: t.nombre,
+                            moneda: t.moneda,
+                            fecha_vencimiento: r.fecha_vencimiento,
+                            total_pendiente: Number(r.total_pendiente),
+                        }
+                    })
+                } catch {
+                    return []
+                }
+            })
+        )
+
+        return listas.flat()
+    }
+
 export default function GlobalPage({ version = 0 }: { version?: number }) {
+    const [recurrentes, setRecurrentes] = useState<RecurrenteProximo[]>([])
+    const [resumenes, setResumenes] = useState<ResumenPendiente[]>([])
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
@@ -92,7 +139,7 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
 
     async function cargar() {
         try {
-            const [movs, ctas, tjs, cats, presupuestos] = await Promise.all([
+            const [movs, ctas, tjs, cats, presupuestos, recs] = await Promise.all([
                 listarMovimientos(),
                 listarCuentas(),
                 listarTarjetas(),
@@ -101,11 +148,16 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
                 listarPresupuestos().catch(function () {
                     return []
                 }),
+                listarRecurrentes().catch(function(){
+                    return[]
+                }),
             ])
             setMovimientos(movs)
             setCuentas(ctas)
             setTarjetas(tjs)
             setCategorias(cats)
+            setRecurrentes(recs)
+            setResumenes(await cargarResumenes(tjs))
 
             const mapa: Record<string, number> = {}
 
@@ -188,6 +240,25 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
             : total
     }, 0)
     const posicionNeta = disponible - deudaTarjetas
+    const idsTarjeta = new Set<number>(
+    cuentas
+        .filter(function (c) {
+            return c.tipo === "TARJETA_CREDITO"
+        })
+        .map(function (c) {
+            return c.id
+        })
+)
+
+    const compromisos = compromisosProximos(
+            resumenes,
+            recurrentes,
+            idsTarjeta,
+            fechaHoy()
+        ).filter(function (c) {
+            return c.moneda === moneda
+        })
+    const apartado = totalApartado(compromisos, moneda)
 
     // KPIs
     const ahorro = tasaAhorro(ingresos, egresos)
@@ -417,6 +488,12 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
                             }
                         />
                     </div>
+                    <DisponibleRealCard
+                        liquidez={disponible}
+                        apartado={apartado}
+                        compromisos={compromisos}
+                        moneda={moneda}
+                    />
 
                     {/* Fila 2: evolución histórica + composición del gasto */}
                     <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
