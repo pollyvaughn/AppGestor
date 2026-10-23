@@ -117,6 +117,7 @@ export default function MensualPage({
     // mes tiene la forma "2026-10": lo separamos en año y número de mes (1 a 12)
     const [anioSel, numeroMesSel] = mes.split("-").map(Number)
     const mesElegidoRef = useRef<HTMLButtonElement>(null)
+    const listaRef = useRef<HTMLDivElement>(null)
 
     function cambiarAnio(delta: number) {
         setMes(`${anioSel + delta}-${String(numeroMesSel).padStart(2, "0")}`)
@@ -136,7 +137,8 @@ export default function MensualPage({
         },
         [mes]
     )
-
+   
+    
     async function cargar() {
         try {
             const [movs, cats, ctas] = await Promise.all([
@@ -329,6 +331,13 @@ export default function MensualPage({
             setCategoriaFiltro(null)
         },
         [mes, moneda]
+    )
+    // al cambiar filtros, la lista vuelve a mostrar los primeros movimientos
+    useEffect(
+        function () {
+            listaRef.current?.scrollTo({ top: 0 })
+        },
+        [filtro, categoriaFiltro, mes, moneda]
     )
 
     function elegirCategoria(tipo: Tipo, categoria: CategoriaResumen) {
@@ -851,7 +860,7 @@ export default function MensualPage({
                             style={estiloCard}
                         >
                             <h2 className="text-xs mb-4" style={estiloTitulo}>
-                                Movimientos
+                                Movimientos ({visibles.length})
                             </h2>
 
                             <div
@@ -911,6 +920,16 @@ export default function MensualPage({
                             {visibles.length === 0 && (
                                 <EstadoVacio texto="No hay movimientos con este filtro." />
                             )}
+                        <div
+                                ref={listaRef}
+                                role="region"
+                                aria-label="Lista de movimientos"
+                                tabIndex={0}
+                                className="lg:max-h-[70vh] lg:overflow-y-auto"
+                            >
+
+                        
+                           
 
                             <ul>
                                 {visibles.map(function (m) {
@@ -1056,6 +1075,8 @@ export default function MensualPage({
                                     )
                                 })}
                             </ul>
+
+                            </div>
                         </section>
                     </div>
                 </>
