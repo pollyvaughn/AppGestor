@@ -83,6 +83,24 @@ export default function CuentasPage({ version = 0 }: { version?: number }) {
         ? Math.round((Number(saldoReal || 0) - Number(ajustando.saldo)) * 100) / 100
         : 0
 
+    // el aviso de éxito se va solo a los 4 segundos
+    useEffect(
+        function () {
+            if (!mensaje) {
+                return
+            }
+
+            const temporizador = setTimeout(function () {
+                setMensaje("")
+            }, 4000)
+
+            return function () {
+                clearTimeout(temporizador)
+            }
+        },
+        [mensaje]
+    )
+
     async function cargar() {
         try {
             const datos: Cuenta[] = await listarCuentas()

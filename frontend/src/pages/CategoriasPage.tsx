@@ -50,6 +50,24 @@ export default function CategoriasPage() {
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
 
+    // el aviso de éxito se va solo a los 4 segundos
+    useEffect(
+        function () {
+            if (!mensaje) {
+                return
+            }
+
+            const temporizador = setTimeout(function () {
+                setMensaje("")
+            }, 4000)
+
+            return function () {
+                clearTimeout(temporizador)
+            }
+        },
+        [mensaje]
+    )
+
     async function cargar() {
         try {
             // true: trae también las desactivadas, para poder reactivarlas
@@ -265,7 +283,7 @@ export default function CategoriasPage() {
                         {renderLista("Ingresos", "INGRESO")}
                     </div>
 
-                    {desactivadas.length > 0 && (
+                    {(
                         <section
                             className="p-6"
                             style={{
@@ -294,6 +312,10 @@ export default function CategoriasPage() {
                                 No aparecen al registrar movimientos. Los
                                 movimientos anteriores las conservan.
                             </p>
+
+                            {desactivadas.length === 0 && (
+                                <EstadoVacio texto="No tenés categorías desactivadas." />
+                            )}
 
                             {desactivadas.map(function (categoria) {
                                 return (
