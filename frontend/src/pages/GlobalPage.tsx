@@ -3,6 +3,8 @@ import { listarMovimientos } from "../services/movimientoService"
 import { listarCuentas } from "../services/cuentaService"
 import { listarTarjetas } from "../services/tarjetaService"
 import { listarCategorias } from "../services/categoriaService"
+import { listarRecurrentes } from "../services/recurrenteService"
+import { listarResumenes } from "../services/resumenService"
 import {
     guardarPresupuesto,
     listarPresupuestos,
@@ -16,6 +18,7 @@ import {
     totalesPorMoneda,
 } from "../lib/movimientos"
 import { formatearMonto } from "../lib/moneda"
+import { fechaHoy } from "../lib/fechas"
 import {
     type ClavePeriodo,
     dentroDe,
@@ -31,28 +34,31 @@ import {
     tasaAhorro,
     variacionPorcentual,
 } from "../lib/resumen"
-import { composicionPorCategoria, composicionPorMetodo, serieDiaria, serieMensual } from "../lib/graficos"
-import MetodoPagoChart from "../components/global/MetodoPagoChart"
-import Cargando from "../components/ui/Cargando"
-import EstadoVacio from "../components/ui/EstadoVacio"
-import Mensaje from "../components/ui/Mensaje"
-import KpiCard from "../components/ui/KpiCard"
-import SelectorPeriodo from "../components/ui/SelectorPeriodo"
-import EvolucionChart from "../components/global/EvolucionChart"
-import ComposicionGastoChart from "../components/global/ComposicionGastoChart"
-import RitmoGastoChart from "../components/global/RitmoGastoChart"
-import TablaMensual from "../components/global/TablaMensual"
-import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
-import { listarRecurrentes } from "../services/recurrenteService"
-import { listarResumenes } from "../services/resumenService"
-import { fechaHoy } from "../lib/fechas"
+import {
+    composicionPorCategoria,
+    composicionPorMetodo,
+    serieDiaria,
+    serieMensual,
+} from "../lib/graficos"
 import {
     type RecurrenteProximo,
     type ResumenPendiente,
     compromisosProximos,
     totalApartado,
 } from "../lib/apartado"
+import MetodoPagoChart from "../components/global/MetodoPagoChart"
 import DisponibleRealCard from "../components/global/DisponibleRealCard"
+import Cargando from "../components/ui/Cargando"
+import EstadoVacio from "../components/ui/EstadoVacio"
+import Mensaje from "../components/ui/Mensaje"
+import KpiCard from "../components/ui/KpiCard"
+import Pestanas from "../components/ui/Pestanas"
+import SelectorPeriodo from "../components/ui/SelectorPeriodo"
+import EvolucionChart from "../components/global/EvolucionChart"
+import ComposicionGastoChart from "../components/global/ComposicionGastoChart"
+import RitmoGastoChart from "../components/global/RitmoGastoChart"
+import TablaMensual from "../components/global/TablaMensual"
+import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
 
 const estiloCard = {
     background: "var(--color-card)",
@@ -66,6 +72,14 @@ const estiloTitulo = {
 }
 
 const SIN_TOTALES = { ingresos: 0, egresos: 0 }
+
+type PestanaGlobal = "resumen" | "evolucion" | "gastos"
+
+const PESTANAS: { key: PestanaGlobal; label: string }[] = [
+    { key: "resumen", label: "Resumen" },
+    { key: "evolucion", label: "Evolución" },
+    { key: "gastos", label: "Gastos" },
+]
 
 function textoOperaciones(cantidad: number) {
     return cantidad === 1 ? "1 operación" : `${cantidad} operaciones`
@@ -82,8 +96,8 @@ type Cuenta = {
 type Tarjeta = {
     id: number
     nombre: string
-    estado: string
     moneda: string
+    estado: string
     deuda_actual: number
 }
 
@@ -92,66 +106,67 @@ type Categoria = {
     color: string | null
 }
 
-
 // Resúmenes pendientes de todas las tarjetas activas. Si una falla,
 // el resto de la página sigue funcionando.
 async function cargarResumenes(
-        tarjetas: Tarjeta[]
-    ): Promise<ResumenPendiente[]> {
-        const activas = tarjetas.filter(function (t) {
-            return t.estado === "ACTIVA"
+    tarjetas: Tarjeta[]
+): Promise<ResumenPendiente[]> {
+    const activas = tarjetas.filter(function (t) {
+        return t.estado === "ACTIVA"
+    })
+
+    const listas = await Promise.all(
+        activas.map(async function (t) {
+            try {
+                const datos = await listarResumenes(t.id)
+
+                return datos.resumenes.map(function (r: any) {
+                    return {
+                        tarjeta: t.nombre,
+                        moneda: t.moneda,
+                        fecha_vencimiento: r.fecha_vencimiento,
+                        total_pendiente: Number(r.total_pendiente),
+                    }
+                })
+            } catch {
+                return []
+            }
         })
+    )
 
-        const listas = await Promise.all(
-            activas.map(async function (t) {
-                try {
-                    const datos = await listarResumenes(t.id)
-
-                    return datos.resumenes.map(function (r: any) {
-                        return {
-                            tarjeta: t.nombre,
-                            moneda: t.moneda,
-                            fecha_vencimiento: r.fecha_vencimiento,
-                            total_pendiente: Number(r.total_pendiente),
-                        }
-                    })
-                } catch {
-                    return []
-                }
-            })
-        )
-
-        return listas.flat()
-    }
+    return listas.flat()
+}
 
 export default function GlobalPage({ version = 0 }: { version?: number }) {
-    const [recurrentes, setRecurrentes] = useState<RecurrenteProximo[]>([])
-    const [resumenes, setResumenes] = useState<ResumenPendiente[]>([])
     const [movimientos, setMovimientos] = useState<Movimiento[]>([])
     const [cuentas, setCuentas] = useState<Cuenta[]>([])
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
+    const [recurrentes, setRecurrentes] = useState<RecurrenteProximo[]>([])
+    const [resumenes, setResumenes] = useState<ResumenPendiente[]>([])
     const [topes, setTopes] = useState<Record<string, number>>({})
     const [monedaElegida, setMonedaElegida] = useState("")
     const [periodoClave, setPeriodoClave] = useState<ClavePeriodo>("mes")
+    const [pestana, setPestana] = useState<PestanaGlobal>("resumen")
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState("")
 
     async function cargar() {
         try {
-            const [movs, ctas, tjs, cats, presupuestos, recs] = await Promise.all([
-                listarMovimientos(),
-                listarCuentas(),
-                listarTarjetas(),
-                listarCategorias(),
-                // si falla (ej. falta la migración) la página sigue sin topes
-                listarPresupuestos().catch(function () {
-                    return []
-                }),
-                listarRecurrentes().catch(function(){
-                    return[]
-                }),
-            ])
+            const [movs, ctas, tjs, cats, presupuestos, recs] =
+                await Promise.all([
+                    listarMovimientos(),
+                    listarCuentas(),
+                    listarTarjetas(),
+                    listarCategorias(),
+                    // si falla (ej. falta la migración) la página sigue sin topes
+                    listarPresupuestos().catch(function () {
+                        return []
+                    }),
+                    listarRecurrentes().catch(function () {
+                        return []
+                    }),
+                ])
             setMovimientos(movs)
             setCuentas(ctas)
             setTarjetas(tjs)
@@ -232,7 +247,7 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
         return m.moneda === moneda && m.tipo === "EGRESO"
     }).length
 
-    // Estos dos son de hoy: no dependen del periodo elegido
+    // Estos son de hoy: no dependen del periodo elegido
     const disponible = patrimonioPorMoneda(cuentas)[moneda] ?? 0
     const deudaTarjetas = tarjetas.reduce(function (total, tarjeta) {
         return tarjeta.moneda === moneda
@@ -240,24 +255,26 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
             : total
     }, 0)
     const posicionNeta = disponible - deudaTarjetas
+
+    // Apartado: compromisos de los próximos 30 días (ver lib/apartado.ts)
     const idsTarjeta = new Set<number>(
-    cuentas
-        .filter(function (c) {
-            return c.tipo === "TARJETA_CREDITO"
-        })
-        .map(function (c) {
-            return c.id
-        })
-)
+        cuentas
+            .filter(function (c) {
+                return c.tipo === "TARJETA_CREDITO"
+            })
+            .map(function (c) {
+                return c.id
+            })
+    )
 
     const compromisos = compromisosProximos(
-            resumenes,
-            recurrentes,
-            idsTarjeta,
-            fechaHoy()
-        ).filter(function (c) {
-            return c.moneda === moneda
-        })
+        resumenes,
+        recurrentes,
+        idsTarjeta,
+        fechaHoy()
+    ).filter(function (c) {
+        return c.moneda === moneda
+    })
     const apartado = totalApartado(compromisos, moneda)
 
     // KPIs
@@ -355,6 +372,7 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
 
             {error && <Mensaje tipo="error">{error}</Mensaje>}
             {!cargando && <AlertaSaldoNegativo cuentas={cuentas} />}
+            {/* Acá va la alerta de tope (C): visible en todas las pestañas */}
             {cargando && <Cargando />}
 
             {!cargando && !error && monedas.length === 0 && (
@@ -363,7 +381,7 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
 
             {!cargando && monedas.length > 0 && (
                 <>
-                    {/* Fila 1: selector de periodo y moneda + 4 KPIs */}
+                    {/* Selector de periodo y moneda: vale para todas las pestañas */}
                     <div className="space-y-3">
                         <SelectorPeriodo
                             value={periodoClave}
@@ -425,149 +443,184 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
                         )}
                     </div>
 
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                        <KpiCard
-                            titulo="Liquidez real"
-                            valor={formatearMonto(disponible, moneda)}
-                            unidad={moneda}
-                            detalle="Saldo actual de tus cuentas"
-                            color={
-                                disponible >= 0
-                                    ? "var(--color-income)"
-                                    : "var(--color-expense)"
-                            }
-                        />
-
-                        <KpiCard
-                            titulo="Tasa de ahorro"
-                            valor={
-                                ahorro === null
-                                    ? "—"
-                                    : formatearPorcentaje(ahorro)
-                            }
-                            detalle={
-                                ahorro === null
-                                    ? "Sin ingresos en el periodo"
-                                    : `Flujo neto: ${flujo >= 0 ? "+" : "−"}${formatearMonto(Math.abs(flujo), moneda)} ${moneda}`
-                            }
-                            color={
-                                ahorro === null
-                                    ? "var(--color-muted-foreground)"
-                                    : ahorro >= 0
-                                      ? "var(--color-income)"
-                                      : "var(--color-expense)"
-                            }
-                        />
-
-                        <KpiCard
-                            titulo="Gastos del periodo"
-                            valor={formatearMonto(egresos, moneda)}
-                            unidad={moneda}
-                            detalle={textoOperaciones(cantidadEgresos)}
-                            color="var(--color-expense)"
-                        />
-
-                        <KpiCard
-                            titulo="Variación de gasto"
-                            valor={
-                                variacion === null
-                                    ? "—"
-                                    : formatearPorcentaje(variacion, true)
-                            }
-                            detalle={
-                                variacion === null
-                                    ? "Sin gastos en el periodo anterior"
-                                    : `Antes: ${formatearMonto(totalesAnterior.egresos, moneda)} ${moneda}`
-                            }
-                            color={
-                                variacion === null || variacion === 0
-                                    ? "var(--color-muted-foreground)"
-                                    : variacion > 0
-                                      ? "var(--color-expense)"
-                                      : "var(--color-income)"
-                            }
-                        />
-                    </div>
-                    <DisponibleRealCard
-                        liquidez={disponible}
-                        apartado={apartado}
-                        compromisos={compromisos}
-                        moneda={moneda}
+                    <Pestanas
+                        idBase="global"
+                        etiqueta="Secciones de Global"
+                        pestanas={PESTANAS}
+                        value={pestana}
+                        onChange={function (clave) {
+                            setPestana(clave as PestanaGlobal)
+                        }}
                     />
 
-                    {/* Fila 2: evolución histórica + composición del gasto */}
-                    <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-                        <EvolucionChart 
-                            datos={serie} 
-                            datosDiarios={serieDia}
-                            moneda={moneda} 
-                            periodo={periodo}
-                            />
+                    {/* Solo se dibuja la pestaña activa: así los gráficos
+                        se miden bien al aparecer. */}
+                    <div
+                        role="tabpanel"
+                        id={`global-panel-${pestana}`}
+                        aria-labelledby={`global-tab-${pestana}`}
+                        className="space-y-6"
+                    >
+                        {pestana === "resumen" && (
+                            <>
+                                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                                    <KpiCard
+                                        titulo="Liquidez real"
+                                        valor={formatearMonto(disponible, moneda)}
+                                        unidad={moneda}
+                                        detalle="Saldo actual de tus cuentas"
+                                        color={
+                                            disponible >= 0
+                                                ? "var(--color-income)"
+                                                : "var(--color-expense)"
+                                        }
+                                    />
 
-                        <ComposicionGastoChart
-                            gastos={porcionesGasto}
-                            ingresos={porcionesIngreso}
-                            totalGastos={egresos}
-                            totalIngresos={ingresos}
-                            moneda={moneda}
-                        />
+                                    <KpiCard
+                                        titulo="Tasa de ahorro"
+                                        valor={
+                                            ahorro === null
+                                                ? "—"
+                                                : formatearPorcentaje(ahorro)
+                                        }
+                                        detalle={
+                                            ahorro === null
+                                                ? "Sin ingresos en el periodo"
+                                                : `Flujo neto: ${flujo >= 0 ? "+" : "−"}${formatearMonto(Math.abs(flujo), moneda)} ${moneda}`
+                                        }
+                                        color={
+                                            ahorro === null
+                                                ? "var(--color-muted-foreground)"
+                                                : ahorro >= 0
+                                                  ? "var(--color-income)"
+                                                  : "var(--color-expense)"
+                                        }
+                                    />
+
+                                    <KpiCard
+                                        titulo="Gastos del periodo"
+                                        valor={formatearMonto(egresos, moneda)}
+                                        unidad={moneda}
+                                        detalle={textoOperaciones(cantidadEgresos)}
+                                        color="var(--color-expense)"
+                                    />
+
+                                    <KpiCard
+                                        titulo="Variación de gasto"
+                                        valor={
+                                            variacion === null
+                                                ? "—"
+                                                : formatearPorcentaje(variacion, true)
+                                        }
+                                        detalle={
+                                            variacion === null
+                                                ? "Sin gastos en el periodo anterior"
+                                                : `Antes: ${formatearMonto(totalesAnterior.egresos, moneda)} ${moneda}`
+                                        }
+                                        color={
+                                            variacion === null || variacion === 0
+                                                ? "var(--color-muted-foreground)"
+                                                : variacion > 0
+                                                  ? "var(--color-expense)"
+                                                  : "var(--color-income)"
+                                        }
+                                    />
+                                </div>
+
+                                <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+                                    <DisponibleRealCard
+                                        liquidez={disponible}
+                                        apartado={apartado}
+                                        compromisos={compromisos}
+                                        moneda={moneda}
+                                    />
+
+                                    <section
+                                        className="p-4 sm:p-6"
+                                        style={estiloCard}
+                                    >
+                                        <h2
+                                            className="text-xs mb-4"
+                                            style={estiloTitulo}
+                                        >
+                                            Métricas del periodo
+                                        </h2>
+
+                                        <dl className="grid gap-5 grid-cols-1">
+                                            {fila(
+                                                "Promedio de gasto diario",
+                                                `${formatearMonto(promedioDiario, moneda)} ${moneda}`,
+                                                `${dias} ${dias === 1 ? "día" : "días"} en el periodo`
+                                            )}
+
+                                            {fila(
+                                                "Ratio de endeudamiento",
+                                                endeudamiento === null
+                                                    ? "—"
+                                                    : formatearPorcentaje(endeudamiento),
+                                                endeudamiento === null
+                                                    ? "Sin ingresos en el periodo para comparar"
+                                                    : `Deuda en tarjetas sobre un ingreso promedio de ${formatearMonto(ingresoPromedioMensual, moneda)} ${moneda} al mes`
+                                            )}
+
+                                            {fila(
+                                                "Deuda pendiente en tarjetas",
+                                                `${formatearMonto(deudaTarjetas, moneda)} ${moneda}`,
+                                                "Cuotas pendientes hoy"
+                                            )}
+
+                                            {fila(
+                                                "Posición neta",
+                                                `${formatearMonto(posicionNeta, moneda)} ${moneda}`,
+                                                "Liquidez real menos deuda pendiente"
+                                            )}
+                                        </dl>
+                                    </section>
+                                </div>
+                            </>
+                        )}
+
+                        {pestana === "evolucion" && (
+                            <>
+                                <EvolucionChart
+                                    datos={serie}
+                                    datosDiarios={serieDia}
+                                    periodo={periodo}
+                                    moneda={moneda}
+                                />
+
+                                <TablaMensual datos={serie} moneda={moneda} />
+                            </>
+                        )}
+
+                        {pestana === "gastos" && (
+                            <>
+                                <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+                                    <ComposicionGastoChart
+                                        gastos={porcionesGasto}
+                                        ingresos={porcionesIngreso}
+                                        totalGastos={egresos}
+                                        totalIngresos={ingresos}
+                                        moneda={moneda}
+                                    />
+
+                                    <MetodoPagoChart
+                                        porciones={porcionesMetodo}
+                                        total={egresos}
+                                        moneda={moneda}
+                                    />
+                                </div>
+
+                                <RitmoGastoChart
+                                    movimientos={contables}
+                                    moneda={moneda}
+                                    tope={topes[moneda] ?? null}
+                                    onGuardarTope={guardarTope}
+                                    onQuitarTope={quitarTope}
+                                />
+                            </>
+                        )}
                     </div>
-
-                    {/* Fila 3: ritmo de gasto + métricas secundarias */}
-                    <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-                        <RitmoGastoChart
-                            movimientos={contables}
-                            moneda={moneda}
-                            tope={topes[moneda] ?? null}
-                            onGuardarTope={guardarTope}
-                            onQuitarTope={quitarTope}
-                        />
-                        {/* Fila 3b: gastos por método de pago */}
-                        <MetodoPagoChart
-                            porciones={porcionesMetodo}
-                            total={egresos}
-                            moneda={moneda}
-                        />
-
-                        <section className="p-4 sm:p-6" style={estiloCard}>
-                            <h2 className="text-xs mb-4" style={estiloTitulo}>
-                                Métricas del periodo
-                            </h2>
-
-                            <dl className="grid gap-5 grid-cols-1">
-                                {fila(
-                                    "Promedio de gasto diario",
-                                    `${formatearMonto(promedioDiario, moneda)} ${moneda}`,
-                                    `${dias} ${dias === 1 ? "día" : "días"} en el periodo`
-                                )}
-
-                                {fila(
-                                    "Ratio de endeudamiento",
-                                    endeudamiento === null
-                                        ? "—"
-                                        : formatearPorcentaje(endeudamiento),
-                                    endeudamiento === null
-                                        ? "Sin ingresos en el periodo para comparar"
-                                        : `Deuda en tarjetas sobre un ingreso promedio de ${formatearMonto(ingresoPromedioMensual, moneda)} ${moneda} al mes`
-                                )}
-
-                                {fila(
-                                    "Deuda pendiente en tarjetas",
-                                    `${formatearMonto(deudaTarjetas, moneda)} ${moneda}`,
-                                    "Cuotas pendientes hoy"
-                                )}
-
-                                {fila(
-                                    "Posición neta",
-                                    `${formatearMonto(posicionNeta, moneda)} ${moneda}`,
-                                    "Liquidez real menos deuda pendiente"
-                                )}
-                            </dl>
-                        </section>
-                    </div>
-
-                    {/* Fila 4: tabla desplegable */}
-                    <TablaMensual datos={serie} moneda={moneda} />
                 </>
             )}
         </div>
