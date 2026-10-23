@@ -61,14 +61,20 @@ export default function MenuAcciones({
                 onClick={function () {
                     setAbierto(!abierto)
                 }}
-                className="w-11 h-11 md:w-7 md:h-7 text-sm"
+                className="flex items-center justify-center"
                 style={{
-                    border: "1px solid var(--color-border)",
-                    borderRadius: "var(--radius-sm)",
+                    width: "1.5rem",
+                    height: "1.5rem",
+                    border: "none",
+                    background: "transparent",
+                    borderRadius: 0,
                     color: "var(--color-muted-foreground)",
+                    padding: 0,
+                    lineHeight: 1,
+                    fontSize: "1.3rem",
                 }}
             >
-                ⋯
+                ⋮
             </button>
 
             {abierto && (

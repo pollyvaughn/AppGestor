@@ -15,6 +15,7 @@ import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import MenuAcciones from "../components/ui/MenuAcciones"
+import Pestanas from "../components/ui/Pestanas"
 
 type Tipo = "INGRESO" | "EGRESO"
 
@@ -49,6 +50,7 @@ export default function CategoriasPage() {
     const [formulario, setFormulario] = useState<Formulario>(formularioInicial)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
+    const [vista, setVista] = useState<"activas" | "desactivadas">("activas")
 
     // el aviso de éxito se va solo a los 4 segundos
     useEffect(
@@ -184,17 +186,20 @@ export default function CategoriasPage() {
     })
 
     function renderLista(titulo: string, tipo: Tipo) {
-        const lista = activas.filter(function (c) {
-            return c.tipo === tipo
-        })
+        const lista = (vista === "activas" ? activas : desactivadas).filter(
+            function (c) {
+                return c.tipo === tipo
+            }
+        )
 
         return (
             <section
-                className="p-6"
+                className="flex flex-col p-6"
                 style={{
                     background: "var(--color-card)",
                     border: "1px solid var(--color-border)",
                     borderRadius: "var(--radius-lg)",
+                    minHeight: 0,
                 }}
             >
                 <h2
@@ -209,53 +214,100 @@ export default function CategoriasPage() {
                     {titulo}
                 </h2>
 
-                {lista.length === 0 && <EstadoVacio texto="Sin categorías." />}
+                <div
+                    className="space-y-1 overflow-y-auto pr-1"
+                    style={{
+                        maxHeight: "calc(100vh - 18rem)",
+                    }}
+                >
+                    {lista.length === 0 && (
+                        <EstadoVacio
+                            texto={
+                                vista === "activas"
+                                    ? "Sin categorías."
+                                    : "No tenés categorías desactivadas."
+                            }
+                        />
+                    )}
 
-                {lista.map(function (categoria) {
-                    return (
-                        <div
-                            key={categoria.id}
-                            className="flex items-center justify-between gap-3 py-2.5"
-                            style={{
-                                borderBottom: "1px solid var(--color-border)",
-                            }}
-                        >
-                            <div className="flex items-center gap-3 min-w-0">
-                                <span
-                                    className="w-3 h-3 rounded-full shrink-0"
-                                    style={{
-                                        background:
-                                            categoria.color ??
-                                            COLOR_POR_DEFECTO,
-                                    }}
-                                />
-                                <span className="text-sm truncate">
-                                    {categoria.nombre}
-                                </span>
-                            </div>
+                    {lista.map(function (categoria) {
+                        const desactivada = !Boolean(categoria.estado)
 
-                            <div className="shrink-0">
-                                <MenuAcciones
-                                    etiqueta={categoria.nombre}
-                                    acciones={[
-                                        {
-                                            label: "Editar",
-                                            onClick: function () {
-                                                abrirEdicion(categoria)
-                                            },
-                                        },
-                                        {
-                                            label: "Desactivar",
-                                            onClick: function () {
-                                                desactivar(categoria)
-                                            },
-                                        },
-                                    ]}
-                                />
+                        return (
+                            <div
+                                key={categoria.id}
+                                className="flex items-center justify-between gap-3 py-2.5"
+                                style={{
+                                    borderBottom: "1px solid var(--color-border)",
+                                }}
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <span
+                                        className="w-3 h-3 rounded-full shrink-0"
+                                        style={{
+                                            background:
+                                                categoria.color ??
+                                                COLOR_POR_DEFECTO,
+                                            opacity: desactivada ? 0.5 : 1,
+                                        }}
+                                    />
+                                    <span
+                                        className="text-sm truncate"
+                                        style={{
+                                            color: desactivada
+                                                ? "var(--color-muted-foreground)"
+                                                : "inherit",
+                                        }}
+                                    >
+                                        {categoria.nombre}
+                                        {vista === "desactivadas" && (
+                                            <span className="text-xs">
+                                                {" · "}
+                                                {categoria.tipo === "INGRESO"
+                                                    ? "Ingreso"
+                                                    : "Egreso"}
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+
+                                {vista === "activas" ? (
+                                    <div className="shrink-0">
+                                        <MenuAcciones
+                                            etiqueta={categoria.nombre}
+                                            acciones={[
+                                                {
+                                                    label: "Editar",
+                                                    onClick: function () {
+                                                        abrirEdicion(categoria)
+                                                    },
+                                                },
+                                                {
+                                                    label: "Desactivar",
+                                                    onClick: function () {
+                                                        desactivar(categoria)
+                                                    },
+                                                },
+                                            ]}
+                                        />
+                                    </div>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        aria-label={`Reactivar ${categoria.nombre}`}
+                                        className="!py-1 !text-xs shrink-0"
+                                        onClick={function () {
+                                            reactivar(categoria)
+                                        }}
+                                    >
+                                        Reactivar
+                                    </Button>
+                                )}
                             </div>
-                        </div>
-                    )
-                })}
+                        )
+                    })}
+                </div>
             </section>
         )
     }
@@ -278,98 +330,23 @@ export default function CategoriasPage() {
                 <Cargando />
             ) : (
                 <>
+                    <Pestanas
+                        idBase="categorias"
+                        etiqueta="Filtrar categorías"
+                        pestanas={[
+                            { key: "activas", label: "Activadas" },
+                            { key: "desactivadas", label: "Desactivadas" },
+                        ]}
+                        value={vista}
+                        onChange={function (key) {
+                            setVista(key as "activas" | "desactivadas")
+                        }}
+                    />
+
                     <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
                         {renderLista("Egresos", "EGRESO")}
                         {renderLista("Ingresos", "INGRESO")}
                     </div>
-
-                    {(
-                        <section
-                            className="p-6"
-                            style={{
-                                background: "var(--color-card)",
-                                border: "1px solid var(--color-border)",
-                                borderRadius: "var(--radius-lg)",
-                            }}
-                        >
-                            <h2
-                                className="text-xs mb-1"
-                                style={{
-                                    color: "var(--color-muted-foreground)",
-                                    fontFamily: "var(--font-mono)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.08em",
-                                }}
-                            >
-                                Desactivadas
-                            </h2>
-                            <p
-                                className="text-xs mb-4"
-                                style={{
-                                    color: "var(--color-muted-foreground)",
-                                }}
-                            >
-                                No aparecen al registrar movimientos. Los
-                                movimientos anteriores las conservan.
-                            </p>
-
-                            {desactivadas.length === 0 && (
-                                <EstadoVacio texto="No tenés categorías desactivadas." />
-                            )}
-
-                            {desactivadas.map(function (categoria) {
-                                return (
-                                    <div
-                                        key={categoria.id}
-                                        className="flex items-center justify-between gap-3 py-2.5"
-                                        style={{
-                                            borderBottom:
-                                                "1px solid var(--color-border)",
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <span
-                                                className="w-3 h-3 rounded-full shrink-0"
-                                                style={{
-                                                    background:
-                                                        categoria.color ??
-                                                        COLOR_POR_DEFECTO,
-                                                    opacity: 0.5,
-                                                }}
-                                            />
-                                            <span
-                                                className="text-sm truncate"
-                                                style={{
-                                                    color: "var(--color-muted-foreground)",
-                                                }}
-                                            >
-                                                {categoria.nombre}
-                                                <span className="text-xs">
-                                                    {" · "}
-                                                    {categoria.tipo ===
-                                                    "INGRESO"
-                                                        ? "Ingreso"
-                                                        : "Egreso"}
-                                                </span>
-                                            </span>
-                                        </div>
-
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            aria-label={`Reactivar ${categoria.nombre}`}
-                                            className="!py-1 !text-xs shrink-0"
-                                            onClick={function () {
-                                                reactivar(categoria)
-                                            }}
-                                        >
-                                            Reactivar
-                                        </Button>
-                                    </div>
-                                )
-                            })}
-                        </section>
-                    )}
                 </>
             )}
 
