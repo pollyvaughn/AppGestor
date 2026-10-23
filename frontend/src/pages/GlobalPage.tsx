@@ -59,6 +59,7 @@ import ComposicionGastoChart from "../components/global/ComposicionGastoChart"
 import RitmoGastoChart from "../components/global/RitmoGastoChart"
 import TablaMensual from "../components/global/TablaMensual"
 import AlertaSaldoNegativo from "../components/ui/AlertaSaldoNegativo"
+import AlertaTope from "../components/global/AlertaTope"
 
 const estiloCard = {
     background: "var(--color-card)",
@@ -372,7 +373,7 @@ export default function GlobalPage({ version = 0 }: { version?: number }) {
 
             {error && <Mensaje tipo="error">{error}</Mensaje>}
             {!cargando && <AlertaSaldoNegativo cuentas={cuentas} />}
-            {/* Acá va la alerta de tope (C): visible en todas las pestañas */}
+            {!cargando && <AlertaTope movimientos={contables} moneda={moneda} tope={topes[moneda] ?? null} />}
             {cargando && <Cargando />}
 
             {!cargando && !error && monedas.length === 0 && (
