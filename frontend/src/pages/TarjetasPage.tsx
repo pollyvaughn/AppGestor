@@ -14,9 +14,10 @@ import Cargando from "../components/ui/Cargando"
 import EstadoVacio from "../components/ui/EstadoVacio"
 import Mensaje from "../components/ui/Mensaje"
 import { formatearMonto } from "../lib/moneda"
-
+import MovimientosCuentaModal from "../components/movimientos/MovimientosCuentaModal"
 type Tarjeta = {
     id: number
+    metodo_pago_id: number   // <- nueva línea
     nombre: string
     moneda: string
     estado: string
@@ -62,7 +63,7 @@ export default function TarjetasPage({ onCambio }: TarjetasPageProps) {
     const [formulario, setFormulario] = useState<Formulario>(formularioInicial)
     const [error, setError] = useState("")
     const [mensaje, setMensaje] = useState("")
-
+    const [viendo, setViendo] = useState<Tarjeta | null>(null)
     async function cargar() {
         try {
             const datos: Tarjeta[] = await listarTarjetas()
@@ -343,6 +344,17 @@ export default function TarjetasPage({ onCambio }: TarjetasPageProps) {
                                 >
                                     Dar de baja
                                 </Button>
+
+                                <Button
+                                    type="button"
+                                    aria-label={`Ver movimientos de ${tarjeta.nombre}`}
+                                    className="!py-1 !text-xs"
+                                    onClick={function () {
+                                        setViendo(tarjeta)
+                                    }}
+                                >
+                                    Ver movimientos
+                                </Button>
                             </div>
                         </div>
                     )
@@ -492,9 +504,24 @@ export default function TarjetasPage({ onCambio }: TarjetasPageProps) {
                         <Button type="submit" className="flex-1">
                             Guardar
                         </Button>
+                    
                     </div>
                 </form>
             </Modal>
+            <MovimientosCuentaModal
+                        cuenta={
+                        viendo
+                            ? {
+                                id: viendo.metodo_pago_id,
+                                nombre: viendo.nombre,
+                                moneda: viendo.moneda,
+                            }
+                            : null
+                    }
+                    onClose={function () {
+                        setViendo(null)
+                    }}
+                />
         </div>
     )
 }
