@@ -55,7 +55,9 @@ def crear_categoria(categoria, usuario_id):
         cursor.close()
         conexion.close()
 
-def listar_categorias(usuario_id):
+# Por defecto solo las activas (así los selectores no cambian).
+# Con incluir_inactivas=True también trae las desactivadas.
+def listar_categorias(usuario_id, incluir_inactivas=False):
     conexion = get_connection()
 
     try:
@@ -65,9 +67,12 @@ def listar_categorias(usuario_id):
             SELECT id, nombre, tipo, color, estado
             FROM categoria
             WHERE usuario_id = %s
-            AND estado = TRUE
-            ORDER BY nombre
         """
+
+        if not incluir_inactivas:
+            sql += " AND estado = TRUE"
+
+        sql += " ORDER BY nombre"
 
         cursor.execute(sql, (usuario_id,))
 
@@ -177,6 +182,37 @@ def eliminar_categoria(categoria_id, usuario_id):
         conexion.commit()
 
         return cursor.rowcount
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+
+# Vuelve a activar una categoría desactivada.
+# Devuelve 0 si no existe, no es del usuario o ya estaba activa.
+def reactivar_categoria(categoria_id, usuario_id):
+    conexion = get_connection()
+
+    try:
+        cursor = conexion.cursor()
+
+        cursor.execute(
+            """
+            UPDATE categoria
+            SET estado = TRUE
+            WHERE id = %s
+            AND usuario_id = %s
+            AND estado = FALSE
+            """,
+            (categoria_id, usuario_id)
+        )
+        conexion.commit()
+
+        return cursor.rowcount
+
+    except Exception:
+        conexion.rollback()
+        raise
 
     finally:
         cursor.close()

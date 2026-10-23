@@ -6,7 +6,8 @@ from backend.services.categoria_service import (
     crear_categoria,
     listar_categorias,
     editar_categoria,
-    eliminar_categoria
+    eliminar_categoria,
+    reactivar_categoria
 )
 
 router = APIRouter(prefix="/categorias", tags=["Categorías"])
@@ -28,8 +29,11 @@ def crear(
     }
 
 @router.get("/")
-def listar(usuario=Depends(obtener_usuario_actual)):
-    return listar_categorias(usuario["id"])
+def listar(
+    incluir_inactivas: bool = False,
+    usuario=Depends(obtener_usuario_actual)
+):
+    return listar_categorias(usuario["id"], incluir_inactivas)
 
 @router.put("/{categoria_id}")
 def editar(
@@ -77,5 +81,26 @@ def eliminar(
         )
 
     return {
-        "mensaje": "Categoría eliminada"
+        "mensaje": "Categoría desactivada"
+    }
+
+
+@router.put("/{categoria_id}/reactivar")
+def reactivar(
+    categoria_id: int,
+    usuario=Depends(obtener_usuario_actual)
+):
+    resultado = reactivar_categoria(
+        categoria_id,
+        usuario["id"]
+    )
+
+    if resultado == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Categoría no encontrada o ya está activa"
+        )
+
+    return {
+        "mensaje": "Categoría reactivada"
     }

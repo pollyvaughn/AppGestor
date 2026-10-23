@@ -4,6 +4,7 @@ import {
     crearCategoria,
     editarCategoria,
     eliminarCategoria,
+    reactivarCategoria,
 } from "../services/categoriaService"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
@@ -22,6 +23,8 @@ type Categoria = {
     nombre: string
     tipo: Tipo
     color: string | null
+    // MySQL devuelve BOOLEAN como 1 o 0
+    estado: boolean | number
 }
 
 type Formulario = {
@@ -49,7 +52,8 @@ export default function CategoriasPage() {
 
     async function cargar() {
         try {
-            const datos = await listarCategorias()
+            // true: trae también las desactivadas, para poder reactivarlas
+            const datos = await listarCategorias(true)
             setCategorias(datos)
         } catch (e) {
             setError(
@@ -113,7 +117,7 @@ export default function CategoriasPage() {
     // Los movimientos anteriores siguen mostrándola.
     async function desactivar(categoria: Categoria) {
         const confirmar = window.confirm(
-            `¿Desactivar la categoría "${categoria.nombre}"? Deja de aparecer al registrar movimientos, pero los movimientos anteriores la conservan.`
+            `¿Desactivar la categoría "${categoria.nombre}"? Deja de aparecer al registrar movimientos, pero los movimientos anteriores la conservan. Después la podés reactivar.`
         )
 
         if (!confirmar) {
@@ -136,8 +140,33 @@ export default function CategoriasPage() {
         }
     }
 
+    async function reactivar(categoria: Categoria) {
+        setError("")
+        setMensaje("")
+
+        try {
+            await reactivarCategoria(categoria.id)
+            setMensaje("Categoría reactivada")
+            await cargar()
+        } catch (e) {
+            setError(
+                e instanceof Error
+                    ? e.message
+                    : "No se pudo reactivar la categoría"
+            )
+        }
+    }
+
+    const activas = categorias.filter(function (c) {
+        return Boolean(c.estado)
+    })
+
+    const desactivadas = categorias.filter(function (c) {
+        return !c.estado
+    })
+
     function renderLista(titulo: string, tipo: Tipo) {
-        const lista = categorias.filter(function (c) {
+        const lista = activas.filter(function (c) {
             return c.tipo === tipo
         })
 
@@ -230,10 +259,96 @@ export default function CategoriasPage() {
             {cargando ? (
                 <Cargando />
             ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                    {renderLista("Egresos", "EGRESO")}
-                    {renderLista("Ingresos", "INGRESO")}
-                </div>
+                <>
+                    <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                        {renderLista("Egresos", "EGRESO")}
+                        {renderLista("Ingresos", "INGRESO")}
+                    </div>
+
+                    {desactivadas.length > 0 && (
+                        <section
+                            className="p-6"
+                            style={{
+                                background: "var(--color-card)",
+                                border: "1px solid var(--color-border)",
+                                borderRadius: "var(--radius-lg)",
+                            }}
+                        >
+                            <h2
+                                className="text-xs mb-1"
+                                style={{
+                                    color: "var(--color-muted-foreground)",
+                                    fontFamily: "var(--font-mono)",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.08em",
+                                }}
+                            >
+                                Desactivadas
+                            </h2>
+                            <p
+                                className="text-xs mb-4"
+                                style={{
+                                    color: "var(--color-muted-foreground)",
+                                }}
+                            >
+                                No aparecen al registrar movimientos. Los
+                                movimientos anteriores las conservan.
+                            </p>
+
+                            {desactivadas.map(function (categoria) {
+                                return (
+                                    <div
+                                        key={categoria.id}
+                                        className="flex items-center justify-between gap-3 py-2.5"
+                                        style={{
+                                            borderBottom:
+                                                "1px solid var(--color-border)",
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <span
+                                                className="w-3 h-3 rounded-full shrink-0"
+                                                style={{
+                                                    background:
+                                                        categoria.color ??
+                                                        COLOR_POR_DEFECTO,
+                                                    opacity: 0.5,
+                                                }}
+                                            />
+                                            <span
+                                                className="text-sm truncate"
+                                                style={{
+                                                    color: "var(--color-muted-foreground)",
+                                                }}
+                                            >
+                                                {categoria.nombre}
+                                                <span className="text-xs">
+                                                    {" · "}
+                                                    {categoria.tipo ===
+                                                    "INGRESO"
+                                                        ? "Ingreso"
+                                                        : "Egreso"}
+                                                </span>
+                                            </span>
+                                        </div>
+
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            aria-label={`Reactivar ${categoria.nombre}`}
+                                            className="!py-1 !text-xs shrink-0"
+                                            onClick={function () {
+                                                reactivar(categoria)
+                                            }}
+                                        >
+                                            Reactivar
+                                        </Button>
+                                    </div>
+                                )
+                            })}
+                        </section>
+                    )}
+                </>
             )}
 
             <Modal
