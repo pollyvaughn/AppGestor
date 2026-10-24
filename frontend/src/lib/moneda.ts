@@ -107,3 +107,15 @@ export function interpretarPegado(texto: string, moneda: string) {
         moneda
     )
 }
+
+// Ajusta un monto ya escrito ("10.5") a la moneda elegida (punto 7).
+// Si la moneda no admite decimales (PYG) se corta la parte decimal:
+// "10.5" => "10". Un monto vacío queda vacío (no se convierte en "0").
+// Sirve cuando el usuario cambia de cuenta con el monto ya escrito.
+export function ajustarMontoAMoneda(valor: string, moneda: string) {
+    if (decimalesDe(moneda) === 0) {
+        return valor.split(".")[0]
+    }
+
+    return valor
+}

@@ -1,3 +1,18 @@
+// =========================================================
+// Pantalla Tarjetas: panel de tarjetas + pestañas Resúmenes / Compras
+//
+// Cambios del punto 7:
+// - abrirNuevaCompra: el menú "Nuevo > Compra con tarjeta" (en App) pide
+//   abrir el formulario de compra. Esta pantalla cambia a la pestaña
+//   "Compras con tarjeta" y, cuando las tarjetas ya cargaron, le pasa el
+//   pedido a ComprasTarjetaPage. Cuando se atiende, avisa con
+//   onNuevaCompraAtendida para que App apague el pedido (si no, al volver
+//   a esta pantalla el formulario se abriría solo).
+// - versionDatos: sube cuando se carga un movimiento o transferencia desde
+//   el menú Nuevo. Se recargan resúmenes y cuentas para que los saldos del
+//   aviso de sobregiro no queden viejos.
+// =========================================================
+
 import { useEffect, useState } from "react"
 import TarjetasPage from "./TarjetasPage"
 import ResumenesTarjeta from "./ResumenesTarjeta"
@@ -18,17 +33,37 @@ const PESTANAS: { key: Pestana; label: string }[] = [
     { key: "compras", label: "Compras con tarjeta" },
 ]
 
-export default function TarjetasYComprasPage() {
+type TarjetasYComprasPageProps = {
+    // sube con cada movimiento o transferencia cargados desde el menú Nuevo
+    versionDatos?: number
+    // true = el menú Nuevo pidió abrir el formulario de nueva compra
+    abrirNuevaCompra?: boolean
+    // se llama cuando el pedido ya se atendió
+    onNuevaCompraAtendida?: () => void
+}
+
+export default function TarjetasYComprasPage({
+    versionDatos = 0,
+    abrirNuevaCompra = false,
+    onNuevaCompraAtendida,
+}: TarjetasYComprasPageProps) {
     const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
+    // false hasta que termina la primera carga de tarjetas (con o sin error)
+    const [tarjetasListas, setTarjetasListas] = useState(false)
     const [version, setVersion] = useState(0)
     const [versionCompras, setVersionCompras] = useState(0)
-    const [pestana, setPestana] = useState<Pestana>("resumenes")
+    // si llega un pedido de compra al montar, se arranca en la pestaña Compras
+    const [pestana, setPestana] = useState<Pestana>(
+        abrirNuevaCompra ? "compras" : "resumenes"
+    )
 
     async function cargarTarjetas() {
         try {
             setTarjetas(await listarTarjetas())
         } catch {
             setTarjetas([])
+        } finally {
+            setTarjetasListas(true)
         }
     }
 
@@ -51,6 +86,16 @@ export default function TarjetasYComprasPage() {
     useEffect(function () {
         cargarTarjetas()
     }, [])
+
+    // si ya estás en Tarjetas y llega el pedido, se pasa a la pestaña Compras
+    useEffect(
+        function () {
+            if (abrirNuevaCompra) {
+                setPestana("compras")
+            }
+        },
+        [abrirNuevaCompra]
+    )
 
     return (
         <div className="space-y-10">
@@ -105,7 +150,7 @@ export default function TarjetasYComprasPage() {
                 >
                     <ResumenesTarjeta
                         tarjetas={tarjetas}
-                        version={version}
+                        version={version + versionDatos}
                         onCambio={alPagarResumen}
                     />
                 </div>
@@ -120,6 +165,9 @@ export default function TarjetasYComprasPage() {
                         key={versionCompras}
                         tarjetas={tarjetas}
                         onCambio={refrescarTodo}
+                        version={versionDatos}
+                        pedirNuevaCompra={abrirNuevaCompra && tarjetasListas}
+                        onPedidoAtendido={onNuevaCompraAtendida}
                     />
                 </div>
             </div>

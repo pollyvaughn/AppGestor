@@ -1,3 +1,17 @@
+// =========================================================
+// Modal para crear o editar un ingreso / egreso
+//
+// Cambios del punto 7:
+// - La fecha no puede ser futura (max en el input + validación al guardar),
+//   igual que en los demás modales y que el backend.
+// - Se saca el select de Moneda: la moneda siempre es la de la cuenta elegida.
+//   Antes aparecía antes de elegir cuenta y después se pisaba.
+// - Al cambiar de cuenta, el monto se ajusta a la moneda nueva
+//   (si pasa a guaraníes se cortan los decimales).
+// - El aviso "Nueva compra con tarjeta" solo aparece al crear un egreso;
+//   al editar no tiene sentido (cerraba la edición y abría otra cosa).
+// =========================================================
+
 import { useEffect, useState } from "react"
 import {
     crearMovimiento,
@@ -7,6 +21,7 @@ import { listarCategorias } from "../../services/categoriaService"
 import { listarCuentas } from "../../services/cuentaService"
 import type { Movimiento } from "../../lib/movimientos"
 import { fechaHoy } from "../../lib/fechas"
+import { ajustarMontoAMoneda } from "../../lib/moneda"
 import { avisoSaldo } from "../../lib/saldo"
 import Button from "../ui/Button"
 import Input from "../ui/Input"
@@ -39,8 +54,6 @@ type Formulario = {
     descripcion: string
 }
 
-const MONEDAS = ["PYG", "USD", "EUR", "ARS", "BRL"]
-
 function formularioVacio(): Formulario {
     return {
         tipo: "EGRESO",
@@ -59,6 +72,7 @@ type MovimientoModalProps = {
     movimiento: Movimiento | null
     onClose: () => void
     onGuardado: (mensaje: string) => void
+    // abre el formulario de nueva compra con tarjeta
     onIrATarjetas: () => void
 }
 
@@ -162,23 +176,15 @@ export default function MovimientoModal({
             return String(c.id) === cuentaId
         })
 
+        // la moneda del movimiento es la de la cuenta elegida
+        const moneda = cuenta ? cuenta.moneda : formulario.moneda
+
         setFormulario({
             ...formulario,
             cuentaId: cuentaId,
-            // si eligió cuenta, la moneda es la de la cuenta
-            moneda: cuenta ? cuenta.moneda : formulario.moneda,
-        })
-    }
-
-    function cambiarMoneda(moneda: string) {
-        setFormulario({
-            ...formulario,
             moneda: moneda,
-            // guaraníes no tienen decimales
-            monto:
-                moneda === "PYG"
-                    ? String(Math.trunc(Number(formulario.monto || 0)))
-                    : formulario.monto,
+            // si la cuenta nueva no admite decimales (PYG) se cortan
+            monto: ajustarMontoAMoneda(formulario.monto, moneda),
         })
     }
 
@@ -206,6 +212,11 @@ export default function MovimientoModal({
 
         if (Number(formulario.monto) <= 0) {
             setError("El monto debe ser mayor a 0")
+            return
+        }
+
+        if (!formulario.fecha || formulario.fecha > fechaHoy()) {
+            setError("Elegí una fecha válida (no puede ser futura)")
             return
         }
 
@@ -284,6 +295,10 @@ export default function MovimientoModal({
 
     const cuentaElegida = formulario.cuentaId !== ""
 
+    // el aviso de tarjeta solo tiene sentido al crear un egreso
+    const mostrarAvisoTarjeta =
+        movimiento === null && formulario.tipo === "EGRESO"
+
     // ---------- Pantalla ----------
 
     return (
@@ -356,69 +371,56 @@ export default function MovimientoModal({
                         })}
                     </Select>
 
-                    <div
-                        className="flex flex-wrap items-center justify-between gap-2 p-3"
-                        style={{
-                            background: "var(--color-muted)",
-                            borderRadius: "var(--radius-sm)",
-                        }}
-                    >
-                        <p
-                            className="text-xs flex-1"
-                            style={{ color: "var(--color-muted-foreground)" }}
-                        >
-                            Las compras con tarjeta se registran en la pestaña
-                            Tarjetas, donde se crean sus cuotas.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={function () {
-                                onClose()
-                                onIrATarjetas()
+                    {mostrarAvisoTarjeta && (
+                        <div
+                            className="flex flex-wrap items-center justify-between gap-2 p-3"
+                            style={{
+                                background: "var(--color-muted)",
+                                borderRadius: "var(--radius-sm)",
                             }}
-                            className="text-xs underline min-h-11 md:min-h-0"
-                            style={{ color: "var(--color-foreground)" }}
                         >
-                            Ir a Tarjetas
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {!cuentaElegida && (
-                            <Select
-                                id="moneda"
-                                label="Moneda"
-                                value={formulario.moneda}
-                                onChange={function (e) {
-                                    cambiarMoneda(e.target.value)
-                                }}
+                            <p
+                                className="text-xs flex-1"
+                                style={{ color: "var(--color-muted-foreground)" }}
                             >
-                                {MONEDAS.map(function (mon) {
-                                    return (
-                                        <option key={mon} value={mon}>
-                                            {mon}
-                                        </option>
-                                    )
-                                })}
-                            </Select>
-                        )}
+                                ¿Fue con tarjeta de crédito? Esas compras se
+                                registran aparte, porque generan cuotas.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={function () {
+                                    onClose()
+                                    onIrATarjetas()
+                                }}
+                                className="text-xs underline min-h-11 md:min-h-0"
+                                style={{ color: "var(--color-foreground)" }}
+                            >
+                                Nueva compra con tarjeta
+                            </button>
+                        </div>
+                    )}
 
-                        <MontoInput
-                            id="monto"
-                            label={`Monto (${formulario.moneda})`}
-                            moneda={formulario.moneda}
-                            value={formulario.monto}
-                            onChange={function (valor) {
-                                setFormulario({ ...formulario, monto: valor })
-                            }}
-                            required
-                        />
-                    </div>
+                    {/* La moneda es la de la cuenta: se muestra en la etiqueta */}
+                    <MontoInput
+                        id="monto"
+                        label={
+                            cuentaElegida
+                                ? `Monto (${formulario.moneda})`
+                                : "Monto"
+                        }
+                        moneda={formulario.moneda}
+                        value={formulario.monto}
+                        onChange={function (valor) {
+                            setFormulario({ ...formulario, monto: valor })
+                        }}
+                        required
+                    />
 
                     <Input
                         id="fecha"
                         label="Fecha"
                         type="date"
+                        max={fechaHoy()}
                         value={formulario.fecha}
                         onChange={function (e) {
                             setFormulario({

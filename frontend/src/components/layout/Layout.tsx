@@ -1,4 +1,15 @@
-import { useEffect, useState } from "react"
+// =========================================================
+// Layout general: header con navegación + botón flotante "Nuevo"
+//
+// Botón "Nuevo": abre un menú con solo los títulos
+//   Movimiento / Transferencia entre cuentas / Compra con tarjeta
+// - Escape o click afuera lo cierran (Escape devuelve el foco al botón)
+// - Al abrir, el foco va a la primera opción
+// - Flechas arriba/abajo, Home y End mueven entre opciones
+// =========================================================
+
+import { useEffect, useRef, useState } from "react"
+import { moverFocoEnMenu } from "../../lib/menuTeclado"
 
 export type Vista =
     | "global"
@@ -37,8 +48,10 @@ export default function Layout({
     children,
 }: LayoutProps) {
     const [menuAbierto, setMenuAbierto] = useState(false)
+    const botonRef = useRef<HTMLButtonElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
 
-    // Escape cierra el menú de crear
+    // Escape cierra el menú y devuelve el foco al botón
     useEffect(
         function () {
             if (!menuAbierto) {
@@ -48,6 +61,7 @@ export default function Layout({
             function alPresionar(e: KeyboardEvent) {
                 if (e.key === "Escape") {
                     setMenuAbierto(false)
+                    botonRef.current?.focus()
                 }
             }
 
@@ -60,10 +74,32 @@ export default function Layout({
         [menuAbierto]
     )
 
+    // al abrir, el foco va a la primera opción
+    useEffect(
+        function () {
+            if (!menuAbierto) {
+                return
+            }
+
+            menuRef.current
+                ?.querySelector<HTMLElement>('[role="menuitem"]')
+                ?.focus()
+        },
+        [menuAbierto]
+    )
+
+    // El foco vuelve al botón antes de cerrar el menú: así, cuando el modal
+    // que abre la acción se cierre, el foco no se pierde en <body>.
+    function elegir(accion: () => void) {
+        botonRef.current?.focus()
+        setMenuAbierto(false)
+        accion()
+    }
+
     const ACCIONES = [
-        { label: "Nuevo movimiento", accion: onNuevoMovimiento },
+        { label: "Movimiento", accion: onNuevoMovimiento },
         { label: "Transferencia entre cuentas", accion: onTransferir },
-        { label: "Nueva compra con tarjeta", accion: onNuevaCompra },
+        { label: "Compra con tarjeta", accion: onNuevaCompra },
     ]
 
     return (
@@ -130,10 +166,11 @@ export default function Layout({
                 {children}
             </main>
 
-            {/* Capa transparente: un click afuera cierra el menú */}
+            {/* Fondo suave: un click afuera cierra el menú */}
             {menuAbierto && (
                 <div
                     className="fixed inset-0 z-40"
+                    style={{ background: "rgba(28,28,26,0.2)" }}
                     onClick={function () {
                         setMenuAbierto(false)
                     }}
@@ -144,9 +181,13 @@ export default function Layout({
             <div className="fixed z-40 right-4 bottom-4 sm:right-6 sm:bottom-6 flex flex-col items-end gap-2">
                 {menuAbierto && (
                     <div
+                        ref={menuRef}
                         role="menu"
-                        aria-label="Crear"
-                        className="flex flex-col overflow-hidden"
+                        aria-label="Nuevo"
+                        onKeyDown={function (e) {
+                            moverFocoEnMenu(e, menuRef.current)
+                        }}
+                        className="flex flex-col overflow-hidden min-w-56"
                         style={{
                             background: "var(--color-card)",
                             border: "1px solid var(--color-border)",
@@ -154,20 +195,23 @@ export default function Layout({
                             boxShadow: "0 4px 12px rgba(28,28,26,0.25)",
                         }}
                     >
-                        {ACCIONES.map(function (item) {
+                        {ACCIONES.map(function (item, indice) {
+                            const esUltima = indice === ACCIONES.length - 1
+
                             return (
                                 <button
                                     key={item.label}
                                     type="button"
                                     role="menuitem"
                                     onClick={function () {
-                                        setMenuAbierto(false)
-                                        item.accion()
+                                        elegir(item.accion)
                                     }}
                                     className="text-left text-sm px-4 py-3 min-h-11"
                                     style={{
-                                        borderBottom:
-                                            "1px solid var(--color-border)",
+                                        // la última sin borde, para no duplicar el del contenedor
+                                        borderBottom: esUltima
+                                            ? "none"
+                                            : "1px solid var(--color-border)",
                                     }}
                                 >
                                     {item.label}
@@ -178,10 +222,11 @@ export default function Layout({
                 )}
 
                 <button
+                    ref={botonRef}
                     type="button"
                     aria-haspopup="menu"
                     aria-expanded={menuAbierto}
-                    aria-label="Crear"
+                    aria-label="Nuevo"
                     onClick={function () {
                         setMenuAbierto(!menuAbierto)
                     }}
@@ -203,7 +248,7 @@ export default function Layout({
                     >
                         +
                     </span>
-                    <span className="hidden sm:inline">Crear</span>
+                    <span className="hidden sm:inline">Nuevo</span>
                 </button>
             </div>
         </div>

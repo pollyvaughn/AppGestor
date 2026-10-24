@@ -1,4 +1,12 @@
+// =========================================================
+// Menú de los tres puntos (⋯) de cada tarjeta o fila
+// - Click afuera o Escape lo cierran (Escape devuelve el foco al botón)
+// - Al abrir, el foco va a la primera opción
+// - Flechas arriba/abajo, Home y End mueven entre opciones
+// =========================================================
+
 import { useEffect, useRef, useState } from "react"
+import { moverFocoEnMenu } from "../../lib/menuTeclado"
 
 type Accion = {
     label: string
@@ -17,6 +25,8 @@ export default function MenuAcciones({
 }: MenuAccionesProps) {
     const [abierto, setAbierto] = useState(false)
     const contenedorRef = useRef<HTMLDivElement>(null)
+    const botonRef = useRef<HTMLButtonElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
 
     // click afuera o Escape cierran el menú
     useEffect(
@@ -37,6 +47,7 @@ export default function MenuAcciones({
             function alPresionar(e: KeyboardEvent) {
                 if (e.key === "Escape") {
                     setAbierto(false)
+                    botonRef.current?.focus()
                 }
             }
 
@@ -51,9 +62,24 @@ export default function MenuAcciones({
         [abierto]
     )
 
+    // al abrir, el foco va a la primera opción
+    useEffect(
+        function () {
+            if (!abierto) {
+                return
+            }
+
+            menuRef.current
+                ?.querySelector<HTMLElement>('[role="menuitem"]')
+                ?.focus()
+        },
+        [abierto]
+    )
+
     return (
         <div ref={contenedorRef} className="relative">
             <button
+                ref={botonRef}
                 type="button"
                 aria-label={`Más opciones de ${etiqueta}`}
                 aria-haspopup="menu"
@@ -61,25 +87,24 @@ export default function MenuAcciones({
                 onClick={function () {
                     setAbierto(!abierto)
                 }}
-                className="flex items-center justify-center"
+                className="w-11 h-11 md:w-7 md:h-7 text-sm"
                 style={{
-                    width: "1.5rem",
-                    height: "1.5rem",
-                    border: "none",
-                    background: "transparent",
-                    borderRadius: 0,
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
                     color: "var(--color-muted-foreground)",
-                    padding: 0,
-                    lineHeight: 1,
-                    fontSize: "1.3rem",
                 }}
             >
-                ⋮
+                ⋯
             </button>
 
             {abierto && (
                 <div
+                    ref={menuRef}
                     role="menu"
+                    aria-label={`Opciones de ${etiqueta}`}
+                    onKeyDown={function (e) {
+                        moverFocoEnMenu(e, menuRef.current)
+                    }}
                     className="absolute right-0 top-full mt-1 z-30 flex flex-col min-w-36 overflow-hidden"
                     style={{
                         background: "var(--color-card)",
@@ -95,6 +120,10 @@ export default function MenuAcciones({
                                 type="button"
                                 role="menuitem"
                                 onClick={function () {
+                                    // el foco vuelve al botón antes de cerrar:
+                                    // si la acción abre un modal, al cerrarlo
+                                    // el foco no se pierde
+                                    botonRef.current?.focus()
                                     setAbierto(false)
                                     accion.onClick()
                                 }}

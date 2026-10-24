@@ -1,3 +1,14 @@
+// =========================================================
+// Compras con tarjeta (pestaña "Compras con tarjeta")
+//
+// Cambios del punto 7:
+// - pedirNuevaCompra: el menú "Nuevo > Compra con tarjeta" abre directo el
+//   modal de nueva compra (antes solo cambiaba de pantalla).
+// - version: cuando cambia (se cargó un movimiento o transferencia desde el
+//   menú Nuevo) se recargan las cuentas, así los avisos de saldo no quedan viejos.
+// - Si hay una sola tarjeta activa, el formulario la trae elegida.
+// =========================================================
+
 import { useEffect, useState } from "react"
 import {
     listarCompras,
@@ -86,11 +97,21 @@ type ComprasTarjetaPageProps = {
     tarjetas: Tarjeta[]
     // se llama cuando cambia la deuda de las tarjetas (compra, pago, ajuste...)
     onCambio?: () => void
+    // sube cuando se cargó un movimiento o transferencia desde el menú Nuevo
+    version?: number
+    // true = el menú Nuevo pidió abrir el formulario de nueva compra.
+    // Solo llega en true cuando las tarjetas ya terminaron de cargar.
+    pedirNuevaCompra?: boolean
+    // se llama una vez atendido el pedido, para que el padre lo apague
+    onPedidoAtendido?: () => void
 }
 
 export default function ComprasTarjetaPage({
     tarjetas,
     onCambio,
+    version = 0,
+    pedirNuevaCompra = false,
+    onPedidoAtendido,
 }: ComprasTarjetaPageProps) {
     const [compras, setCompras] = useState<Compra[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -207,10 +228,18 @@ export default function ComprasTarjetaPage({
         onCambio?.()
     }
 
+    // compras y categorías: una vez al montar
     useEffect(function () {
         cargar()
-        cargarCuentas()
     }, [])
+
+    // cuentas: al montar y cada vez que sube version (saldos al día)
+    useEffect(
+        function () {
+            cargarCuentas()
+        },
+        [version]
+    )
 
     // ---------- Datos calculados ----------
 
@@ -250,10 +279,37 @@ export default function ComprasTarjetaPage({
     // ---------- Nueva compra ----------
 
     function abrirNueva() {
-        setFormulario(formularioVacio())
+        const base = formularioVacio()
+
+        // con una sola tarjeta activa no hace falta elegir
+        if (tarjetasActivas.length === 1) {
+            base.tarjetaId = String(tarjetasActivas[0].id)
+        }
+
+        setFormulario(base)
         setErrorModal("")
         setModalNueva(true)
     }
+
+    // El menú "Nuevo > Compra con tarjeta" pide abrir el formulario.
+    // Se avisa al padre primero para que apague el pedido: así, si esta
+    // pantalla se vuelve a montar, el modal no se reabre solo.
+    // Sin tarjetas activas no se abre nada: la pantalla ya explica que
+    // hay que crear una tarjeta.
+    useEffect(
+        function () {
+            if (!pedirNuevaCompra) {
+                return
+            }
+
+            onPedidoAtendido?.()
+
+            if (tarjetasActivas.length > 0) {
+                abrirNueva()
+            }
+        },
+        [pedirNuevaCompra]
+    )
 
     function cambiarTarjeta(tarjetaId: string) {
         const tarjeta = tarjetas.find(function (t) {

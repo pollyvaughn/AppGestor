@@ -1,3 +1,17 @@
+// =========================================================
+// App: sesión, configuración inicial, navegación y modales globales
+//
+// Cambios del punto 7:
+// - "aviso" ahora lleva tipo (error o éxito) y se muestra fijo arriba a la
+//   derecha: antes salía arriba de la página (fuera de pantalla si estabas
+//   más abajo) y los errores se veían en verde como si fueran éxito.
+// - "Compra con tarjeta" (menú Nuevo) y "Nueva compra con tarjeta" (modal de
+//   movimiento) abren directo el formulario de compra: App va a Tarjetas y
+//   deja un pedido pendiente que TarjetasYComprasPage atiende y apaga.
+// - Tarjetas y Recurrentes se actualizan cuando se carga un movimiento o una
+//   transferencia (saldos al día en los avisos de sobregiro).
+// =========================================================
+
 import { useEffect, useState } from "react"
 import LoginPage from "./pages/LoginPage"
 import RegisterPage from "./pages/RegisterPage"
@@ -21,6 +35,9 @@ import TransferenciaModal from "./components/movimientos/TransferenciaModal"
 type EstadoConfiguracion = "cargando" | "requerida" | "completa" | "error"
 type CuentaConfiguracion = { tipo: string }
 
+// Aviso flotante: éxito se va a los 4 segundos, error a los 6
+type Aviso = { tipo: "error" | "exito"; texto: string } | null
+
 export default function App() {
     const [usuario, setUsuario] = useState<Usuario | null>(function () {
         const usuarioGuardado = localStorage.getItem("usuario")
@@ -33,7 +50,11 @@ export default function App() {
     })
     const [modalMovimiento, setModalMovimiento] = useState(false)
     const [versionDatos, setVersionDatos] = useState(0)
-    const [aviso, setAviso] = useState("")
+    const [aviso, setAviso] = useState<Aviso>(null)
+
+    // true = falta abrir el formulario de nueva compra con tarjeta.
+    // Lo apaga TarjetasYComprasPage cuando lo atiende.
+    const [abrirCompraPendiente, setAbrirCompraPendiente] = useState(false)
 
     const [mostrarRegistro, setMostrarRegistro] = useState(false)
     const [vista, setVista] = useState<Vista>("mensual")
@@ -44,15 +65,19 @@ export default function App() {
     const [modalTransferencia, setModalTransferencia] = useState(false)
     const [cuentasTransferencia, setCuentasTransferencia] = useState<any[]>([])
 
+    // el aviso se va solo (los errores duran más para poder leerlos)
     useEffect(
         function () {
             if (!aviso) {
                 return
             }
 
-            const temporizador = setTimeout(function () {
-                setAviso("")
-            }, 4000)
+            const temporizador = setTimeout(
+                function () {
+                    setAviso(null)
+                },
+                aviso.tipo === "error" ? 6000 : 4000
+            )
 
             return function () {
                 clearTimeout(temporizador)
@@ -110,12 +135,27 @@ export default function App() {
             setCuentasTransferencia(await listarCuentas())
             setModalTransferencia(true)
         } catch (e) {
-            setAviso(
-                e instanceof Error
-                    ? e.message
-                    : "No se pudieron cargar las cuentas"
-            )
+            setAviso({
+                tipo: "error",
+                texto:
+                    e instanceof Error
+                        ? e.message
+                        : "No se pudieron cargar las cuentas",
+            })
         }
+    }
+
+    // Va a Tarjetas y deja el pedido de abrir el formulario de nueva compra
+    function abrirNuevaCompra() {
+        setAbrirCompraPendiente(true)
+        setVista("tarjetas")
+    }
+
+    // las vistas que muestran saldos y movimientos se recargan
+    function datosCambiaron() {
+        setVersionDatos(function (v) {
+            return v + 1
+        })
     }
 
     if (!usuario) {
@@ -197,30 +237,46 @@ export default function App() {
                     setModalMovimiento(true)
                 }}
                 onTransferir={abrirTransferencia}
-                onNuevaCompra={function () {
-                    setVista("tarjetas")
-                }}
+                onNuevaCompra={abrirNuevaCompra}
             >
-                {aviso && (
-                    <div className="mb-4">
-                        <Mensaje tipo="exito">{aviso}</Mensaje>
-                    </div>
-                )}
-
                 {vista === "global" && <GlobalPage version={versionDatos} />}
                 {vista === "mensual" && (
                     <MensualPage
                         version={versionDatos}
-                        onIrATarjetas={function () {
-                            setVista("tarjetas")
+                        onIrATarjetas={abrirNuevaCompra}
+                    />
+                )}
+                {vista === "tarjetas" && (
+                    <TarjetasYComprasPage
+                        versionDatos={versionDatos}
+                        abrirNuevaCompra={abrirCompraPendiente}
+                        onNuevaCompraAtendida={function () {
+                            setAbrirCompraPendiente(false)
                         }}
                     />
                 )}
-                {vista === "tarjetas" && <TarjetasYComprasPage />}
-                {vista === "recurrentes" && <RecurrentesPage />}
+                {/* key: se vuelve a montar al cargar un movimiento, así sus
+                    cuentas y saldos quedan al día */}
+                {vista === "recurrentes" && (
+                    <RecurrentesPage key={versionDatos} />
+                )}
                 {vista === "categorias" && <CategoriasPage />}
                 {vista === "cuentas" && <CuentasPage version={versionDatos} />}
             </Layout>
+
+            {/* Aviso flotante: se ve aunque la página esté scrolleada y
+                queda por encima de los modales */}
+            {aviso && (
+                <div
+                    className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-[60]"
+                    style={{
+                        boxShadow: "0 4px 12px rgba(28,28,26,0.15)",
+                        borderRadius: "var(--radius-sm)",
+                    }}
+                >
+                    <Mensaje tipo={aviso.tipo}>{aviso.texto}</Mensaje>
+                </div>
+            )}
 
             <MovimientoModal
                 open={modalMovimiento}
@@ -229,16 +285,10 @@ export default function App() {
                     setModalMovimiento(false)
                 }}
                 onGuardado={function (mensaje) {
-                    setAviso(mensaje)
-                    // las vistas que muestran saldos y movimientos se recargan
-                    setVersionDatos(function (v) {
-                        return v + 1
-                    })
+                    setAviso({ tipo: "exito", texto: mensaje })
+                    datosCambiaron()
                 }}
-                onIrATarjetas={function () {
-                    setVista("tarjetas")
-                }}
-
+                onIrATarjetas={abrirNuevaCompra}
             />
             <TransferenciaModal
                 open={modalTransferencia}
@@ -247,10 +297,8 @@ export default function App() {
                     setModalTransferencia(false)
                 }}
                 onGuardado={function () {
-                    setAviso("Transferencia registrada")
-                    setVersionDatos(function (v) {
-                        return v + 1
-                    })
+                    setAviso({ tipo: "exito", texto: "Transferencia registrada" })
+                    datosCambiaron()
                 }}
             />
         </>
