@@ -194,12 +194,13 @@ export default function CategoriasPage() {
 
         return (
             <section
-                className="flex flex-col p-6"
+                className="flex flex-col overflow-hidden p-6"
                 style={{
                     background: "var(--color-card)",
                     border: "1px solid var(--color-border)",
                     borderRadius: "var(--radius-lg)",
                     minHeight: 0,
+                    maxHeight: "75dvh",
                 }}
             >
                 <h2
@@ -215,9 +216,9 @@ export default function CategoriasPage() {
                 </h2>
 
                 <div
-                    className="space-y-1 overflow-y-auto pr-1"
+                    className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1"
                     style={{
-                        maxHeight: "calc(100vh - 18rem)",
+                        overscrollBehavior: "contain",
                     }}
                 >
                     {lista.length === 0 && (
@@ -339,11 +340,19 @@ export default function CategoriasPage() {
                         ]}
                         value={vista}
                         onChange={function (key) {
-                            setVista(key as "activas" | "desactivadas")
+                            if (key === "activas" || key === "desactivadas") {
+                                setVista(key)
+                            }
                         }}
                     />
 
-                    <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                    <div
+                        id={`categorias-panel-${vista}`}
+                        role="tabpanel"
+                        aria-labelledby={`categorias-tab-${vista}`}
+                        tabIndex={0}
+                        className="grid gap-6 grid-cols-1 md:grid-cols-2"
+                    >
                         {renderLista("Egresos", "EGRESO")}
                         {renderLista("Ingresos", "INGRESO")}
                     </div>
