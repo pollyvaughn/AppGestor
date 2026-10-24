@@ -1,7 +1,7 @@
 // =========================================================
 // App: sesión, configuración inicial, navegación y modales globales
 //
-// Cambios del punto 7:
+// Cambios
 // - "aviso" ahora lleva tipo (error o éxito) y se muestra fijo arriba a la
 //   derecha: antes salía arriba de la página (fuera de pantalla si estabas
 //   más abajo) y los errores se veían en verde como si fueran éxito.
@@ -18,7 +18,6 @@ import RegisterPage from "./pages/RegisterPage"
 import type { Usuario } from "./types/auth"
 import { listarCuentas } from "./services/cuentaService"
 import Layout from "./components/layout/Layout"
-import type { Vista } from "./components/layout/Layout"
 import GlobalPage from "./pages/GlobalPage"
 import MensualPage from "./pages/MensualPage"
 import TarjetasYComprasPage from "./pages/TarjetasYComprasPage"
@@ -31,6 +30,7 @@ import Mensaje from "./components/ui/Mensaje"
 import Button from "./components/ui/Button"
 import MovimientoModal from "./components/movimientos/MovimientoModal"
 import TransferenciaModal from "./components/movimientos/TransferenciaModal"
+import { useVistaHash } from "./lib/useVistaHash"
 
 type EstadoConfiguracion = "cargando" | "requerida" | "completa" | "error"
 type CuentaConfiguracion = { tipo: string }
@@ -57,7 +57,7 @@ export default function App() {
     const [abrirCompraPendiente, setAbrirCompraPendiente] = useState(false)
 
     const [mostrarRegistro, setMostrarRegistro] = useState(false)
-    const [vista, setVista] = useState<Vista>("mensual")
+    const [vista, setVista] = useVistaHash()
     const [estadoConfiguracion, setEstadoConfiguracion] =
         useState<EstadoConfiguracion>("cargando")
     const [errorConfiguracion, setErrorConfiguracion] = useState("")

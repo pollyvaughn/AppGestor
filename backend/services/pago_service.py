@@ -698,7 +698,7 @@ def editar_pago(pago_id, pago, usuario_id):
 
 
 # ---------------------------------------------------------
-# ANULAR PAGO  (punto 1 del roadmap)
+# ANULAR PAGO
 # ---------------------------------------------------------
 def anular_pago(pago_id, usuario_id):
     conexion = get_connection()
